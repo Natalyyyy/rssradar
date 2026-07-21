@@ -104,8 +104,8 @@ def claude_summary(entries, prompt_path):
     for e in entries:
         title = " ".join((e["title"] or "").split())
         digest.append("- {} — {}".format(title, e["link"]))
-    prompt = Path(prompt_path).read_text(encoding="utf-8") + "\n\n" + "\n".join(digest)
     try:
+        prompt = Path(prompt_path).read_text(encoding="utf-8") + "\n\n" + "\n".join(digest)
         result = subprocess.run(
             ["claude", "-p", "--output-format", "text"],
             input=prompt, capture_output=True, text=True, timeout=300,

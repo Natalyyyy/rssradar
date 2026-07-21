@@ -23,3 +23,9 @@ def test_build_weekly_uses_claude_when_available(monkeypatch):
     cfg = common.DEFAULTS.copy()
     text = report.build_weekly(con, cfg)
     assert "Горячее" in text
+
+
+def test_claude_summary_returns_none_on_bad_prompt_path():
+    entries = [{"title": "t", "link": "https://x/1"}]
+    result = report.claude_summary(entries, "/nonexistent/prompt/path.md")
+    assert result is None
