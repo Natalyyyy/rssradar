@@ -117,7 +117,12 @@ def main():
     ap.add_argument("action", choices=["install", "remove", "status"])
     args = ap.parse_args()
     if args.action == "install":
-        install(common.load_config())
+        try:
+            cfg = common.load_config()
+        except common.ConfigError as exc:
+            print(str(exc), file=sys.stderr)
+            sys.exit(1)
+        install(cfg)
     elif args.action == "remove":
         remove()
     else:

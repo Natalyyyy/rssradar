@@ -183,6 +183,10 @@ def claude_clusters(entries, prompt_path):
     return None
 
 
+def _safe_href(link):
+    return link if str(link or "").lower().startswith(("http://", "https://")) else ""
+
+
 def render_map_html(clusters, title):
     esc = html_lib.escape
     if not clusters:
@@ -191,10 +195,16 @@ def render_map_html(clusters, title):
         cards = []
         for c in clusters:
             heat = max(1, min(int(c.get("heat", 1)), 6))
-            items = "".join(
-                "<li><a href='{}'>{}</a></li>".format(
-                    esc(i.get("link", "")), esc(i.get("title", "")))
-                for i in c.get("items", []))
+            item_htmls = []
+            for i in c.get("items", []):
+                href = _safe_href(i.get("link", ""))
+                title_html = esc(i.get("title", ""))
+                if href:
+                    item_htmls.append("<li><a href='{}'>{}</a></li>".format(
+                        esc(href), title_html))
+                else:
+                    item_htmls.append("<li>{}</li>".format(title_html))
+            items = "".join(item_htmls)
             cards.append(
                 "<section class='card heat-{h}'><h2>{t}</h2><ul>{i}</ul></section>".format(
                     h=heat, t=esc(c.get("theme", "")), i=items))
@@ -252,7 +262,12 @@ def main():
     ap.add_argument("--no-fetch", action="store_true", help="только по данным из базы")
     args = ap.parse_args()
 
-    cfg, env, con = common.load_config(), common.load_env(), common.connect()
+    try:
+        cfg = common.load_config()
+    except common.ConfigError as exc:
+        print(str(exc), file=sys.stderr)
+        sys.exit(1)
+    env, con = common.load_env(), common.connect()
 
     if not args.no_fetch:
         import fetch

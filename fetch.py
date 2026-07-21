@@ -82,7 +82,12 @@ def main():
     ap.add_argument("--limit", type=int, default=None,
                     help="ограничить число записей на фид (холодный старт, напр. 30)")
     args = ap.parse_args()
-    n_new, errors = run_fetch(limit=args.limit)
+    try:
+        cfg = common.load_config()
+    except common.ConfigError as exc:
+        print(str(exc), file=sys.stderr)
+        sys.exit(1)
+    n_new, errors = run_fetch(cfg=cfg, limit=args.limit)
     print("Новых записей: {}".format(n_new))
     for feed, e in errors.items():
         print("⚠️ {}: {}".format(feed, e), file=sys.stderr)

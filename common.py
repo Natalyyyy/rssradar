@@ -4,6 +4,10 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+class ConfigError(Exception):
+    pass
+
+
 ROOT = Path(__file__).resolve().parent
 DATA_DIR = ROOT / "data"
 DB_PATH = DATA_DIR / "rssradar.db"
@@ -75,7 +79,11 @@ def load_config(path=None):
     path = Path(path or CONFIG_PATH)
     cfg = dict(DEFAULTS)
     if path.exists():
-        cfg.update(json.loads(path.read_text(encoding="utf-8")))
+        try:
+            cfg.update(json.loads(path.read_text(encoding="utf-8")))
+        except json.JSONDecodeError as exc:
+            raise ConfigError(
+                "❌ {} повреждён — проверь JSON (лишняя запятая?): {}".format(path, exc))
     return cfg
 
 

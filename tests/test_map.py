@@ -56,3 +56,22 @@ def test_clean_clusters_drops_malformed():
 def test_clean_clusters_none_on_non_list():
     assert report._clean_clusters({"not": "a list"}) is None
     assert report._clean_clusters([]) is None
+
+
+def test_render_map_html_blocks_unsafe_link_scheme():
+    clusters = [
+        {"theme": "T", "heat": 3,
+         "items": [{"title": "Bad", "link": "javascript:alert(1)"}]},
+    ]
+    html = report.render_map_html(clusters, "T")
+    assert "javascript:" not in html
+    assert "href='javascript" not in html
+
+
+def test_render_map_html_keeps_safe_https_link():
+    clusters = [
+        {"theme": "T", "heat": 3,
+         "items": [{"title": "Good", "link": "https://x/1"}]},
+    ]
+    html = report.render_map_html(clusters, "T")
+    assert "href='https://x/1'" in html
