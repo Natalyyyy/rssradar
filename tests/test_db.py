@@ -34,6 +34,22 @@ def test_data_span_days():
     assert common.data_span_days(con) == 10
 
 
+def test_record_terms_falls_back_to_first_seen():
+    con = make_con()
+    old_first_seen = "2026-07-01T09:00:00+00:00"
+    con.execute(
+        "INSERT INTO entries (feed_url, entry_id, title, link, published, summary, first_seen) "
+        "VALUES (?,?,?,?,?,?,?)",
+        ("f1", "e1", "теги", "https://x/e1", "", "", old_first_seen),
+    )
+    con.commit()
+    r = rec("f1", "e1", "теги", "")           # published отсутствует
+    common.record_terms(con, [r])
+    day = con.execute(
+        "SELECT day FROM term_counts WHERE term='тег'").fetchone()[0]
+    assert day == "2026-07-01"                # дата first_seen, НЕ сегодня
+
+
 def test_alert_cooldown():
     con = make_con()
     now = common.now_utc()

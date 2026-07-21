@@ -127,9 +127,23 @@ def save_entries(con, records):
 def record_terms(con, records):
     for r in records:
         published = r.get("published") or ""
-        try:
-            day = day_of(parse_ts(published)) if published else day_of(now_utc())
-        except ValueError:
+        day = None
+        if published:
+            try:
+                day = day_of(parse_ts(published))
+            except ValueError:
+                day = None
+        if day is None:
+            row = con.execute(
+                "SELECT first_seen FROM entries WHERE feed_url=? AND entry_id=?",
+                (r["feed_url"], r["entry_id"]),
+            ).fetchone()
+            if row and row["first_seen"]:
+                try:
+                    day = day_of(parse_ts(row["first_seen"]))
+                except ValueError:
+                    day = None
+        if day is None:
             day = day_of(now_utc())
         for term in set(normalize_terms(r.get("title", ""))):
             con.execute(
