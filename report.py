@@ -238,3 +238,47 @@ def build_map(con, cfg, now=None):
                                for e in entries]}] if entries else []
     html = render_map_html(clusters, "RSS-карта трендов")
     return str(write_and_open(html))
+
+
+FETCH_ERROR_MSG = (
+    "⚠️ rssradar: не удалось собрать фиды (сеть или битый фид). "
+    "Проверь список в config.json.")
+
+
+def main():
+    ap = argparse.ArgumentParser(description="Отчёты rssradar")
+    ap.add_argument("mode", choices=["pulse", "weekly", "map"])
+    ap.add_argument("--send", action="store_true", help="отправить в Telegram")
+    ap.add_argument("--no-fetch", action="store_true", help="только по данным из базы")
+    args = ap.parse_args()
+
+    cfg, env, con = common.load_config(), common.load_env(), common.connect()
+
+    if not args.no_fetch:
+        import fetch
+        try:
+            fetch.run_fetch(cfg=cfg, con=con)
+        except Exception as exc:                       # noqa: BLE001
+            print("{} ({})".format(FETCH_ERROR_MSG, exc), file=sys.stderr)
+
+    if args.mode == "pulse":
+        signals = pulse_signals(con, cfg)
+        if not signals:
+            print("Тихо: всплесков нет.")
+            return
+        text = format_pulse(signals)
+        common.mark_alerted(con, [s["term"] for s in signals])
+    elif args.mode == "weekly":
+        text = build_weekly(con, cfg)
+    else:
+        path = build_map(con, cfg)
+        text = "🗺 Карта трендов собрана: {}".format(path)
+
+    print(text)
+    if args.send and env.get("TELEGRAM_TOKEN") and env.get("TELEGRAM_CHAT_ID"):
+        import telegram
+        telegram.send(text, env["TELEGRAM_TOKEN"], env["TELEGRAM_CHAT_ID"])
+
+
+if __name__ == "__main__":
+    main()
