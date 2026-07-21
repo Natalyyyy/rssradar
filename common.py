@@ -78,3 +78,41 @@ def connect(db_path=None):
     if SCHEMA.strip():
         con.executescript(SCHEMA)
     return con
+
+
+import re
+
+try:
+    import pymorphy3
+    _MORPH = pymorphy3.MorphAnalyzer()
+except Exception:          # noqa: BLE001 — нет pymorphy3 → фолбэк без лемм
+    _MORPH = None
+
+_TOKEN_RE = re.compile(r"[а-яёa-z0-9]+", re.IGNORECASE)
+_RU_STOP = {
+    "и", "в", "во", "не", "что", "он", "на", "я", "с", "со", "как", "а", "то",
+    "все", "она", "так", "его", "но", "да", "ты", "к", "у", "же", "вы", "за",
+    "бы", "по", "только", "ее", "мне", "было", "вот", "от", "меня", "о", "из",
+    "для", "про", "это", "этот", "эта", "мы", "они", "или", "при", "над", "под",
+}
+_EN_STOP = {
+    "the", "a", "an", "and", "or", "of", "to", "in", "on", "for", "is", "are",
+    "was", "with", "as", "at", "by", "from", "how", "why", "what", "new", "your",
+}
+
+
+def normalize_terms(text):
+    terms = []
+    for tok in _TOKEN_RE.findall((text or "").lower()):
+        if len(tok) < 3:
+            continue
+        if re.search(r"[а-яё]", tok):
+            if tok in _RU_STOP:
+                continue
+            lemma = _MORPH.parse(tok)[0].normal_form if _MORPH else tok
+        else:
+            if tok in _EN_STOP:
+                continue
+            lemma = tok
+        terms.append(lemma)
+    return terms
