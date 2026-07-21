@@ -1,7 +1,7 @@
 """Общие утилиты rssradar: .env, конфиг, база, нормализация терминов."""
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -24,7 +24,35 @@ DEFAULTS = {
     "pulse_time": "10:00",
 }
 
-SCHEMA = ""  # наполняется в Task 3
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS entries (
+    feed_url   TEXT NOT NULL,
+    entry_id   TEXT NOT NULL,
+    title      TEXT,
+    link       TEXT,
+    published  TEXT,
+    summary    TEXT,
+    first_seen TEXT NOT NULL,
+    PRIMARY KEY (feed_url, entry_id)
+);
+CREATE TABLE IF NOT EXISTS term_counts (
+    term     TEXT NOT NULL,
+    day      TEXT NOT NULL,
+    feed_url TEXT NOT NULL,
+    PRIMARY KEY (term, day, feed_url)
+);
+CREATE TABLE IF NOT EXISTS pulse_alerts (
+    term       TEXT PRIMARY KEY,
+    alerted_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS feed_status (
+    feed_url  TEXT PRIMARY KEY,
+    etag      TEXT,
+    modified  TEXT,
+    last_ok   TEXT,
+    last_error TEXT
+);
+"""
 
 
 def load_env(path=None):
@@ -78,6 +106,91 @@ def connect(db_path=None):
     if SCHEMA.strip():
         con.executescript(SCHEMA)
     return con
+
+
+def save_entries(con, records):
+    new = 0
+    stamp = now_utc().isoformat()
+    for r in records:
+        cur = con.execute(
+            "INSERT OR IGNORE INTO entries "
+            "(feed_url, entry_id, title, link, published, summary, first_seen) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (r["feed_url"], r["entry_id"], r.get("title", ""), r.get("link", ""),
+             r.get("published", ""), r.get("summary", ""), stamp),
+        )
+        new += cur.rowcount
+    con.commit()
+    return new
+
+
+def record_terms(con, records):
+    for r in records:
+        published = r.get("published") or ""
+        try:
+            day = day_of(parse_ts(published)) if published else day_of(now_utc())
+        except ValueError:
+            day = day_of(now_utc())
+        for term in set(normalize_terms(r.get("title", ""))):
+            con.execute(
+                "INSERT OR IGNORE INTO term_counts (term, day, feed_url) VALUES (?,?,?)",
+                (term, day, r["feed_url"]),
+            )
+    con.commit()
+
+
+def get_feed_cache(con, feed_url):
+    row = con.execute(
+        "SELECT etag, modified FROM feed_status WHERE feed_url = ?", (feed_url,)
+    ).fetchone()
+    return (row["etag"], row["modified"]) if row else (None, None)
+
+
+def set_feed_status(con, feed_url, etag=None, modified=None, error=None):
+    stamp = now_utc().isoformat()
+    if error is None:
+        con.execute(
+            "INSERT INTO feed_status (feed_url, etag, modified, last_ok, last_error) "
+            "VALUES (?,?,?,?,NULL) "
+            "ON CONFLICT(feed_url) DO UPDATE SET etag=excluded.etag, "
+            "modified=excluded.modified, last_ok=excluded.last_ok, last_error=NULL",
+            (feed_url, etag, modified, stamp),
+        )
+    else:
+        con.execute(
+            "INSERT INTO feed_status (feed_url, last_error) VALUES (?,?) "
+            "ON CONFLICT(feed_url) DO UPDATE SET last_error=excluded.last_error",
+            (feed_url, error),
+        )
+    con.commit()
+
+
+def data_span_days(con, now=None):
+    row = con.execute("SELECT MIN(day) AS lo, MAX(day) AS hi FROM term_counts").fetchone()
+    if not row or not row["lo"]:
+        return 0
+    lo = parse_ts(row["lo"] + "T00:00:00Z")
+    hi = parse_ts(row["hi"] + "T00:00:00Z")
+    return int((hi - lo).total_seconds() // 86400)
+
+
+def was_alerted_recently(con, term, now, cooldown_days):
+    row = con.execute(
+        "SELECT alerted_at FROM pulse_alerts WHERE term = ?", (term,)
+    ).fetchone()
+    if not row:
+        return False
+    return parse_ts(row["alerted_at"]) >= now - timedelta(days=cooldown_days)
+
+
+def mark_alerted(con, terms, at=None):
+    stamp = (at or now_utc()).isoformat()
+    con.executemany(
+        "INSERT INTO pulse_alerts (term, alerted_at) VALUES (?,?) "
+        "ON CONFLICT(term) DO UPDATE SET alerted_at=excluded.alerted_at",
+        [(t, stamp) for t in terms],
+    )
+    con.commit()
 
 
 import re
