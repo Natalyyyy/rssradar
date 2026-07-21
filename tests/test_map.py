@@ -33,3 +33,26 @@ def test_claude_clusters_returns_none_on_bad_prompt_path():
     entries = [{"title": "t", "link": "https://x/1"}]
     result = report.claude_clusters(entries, "/nonexistent/prompt/path.md")
     assert result is None
+
+
+def test_clean_clusters_drops_malformed():
+    result = report._clean_clusters([
+        {"theme": None, "heat": "n/a", "items": "nope"},
+        "junk",
+        {"theme": "X", "heat": 5, "items": [{"title": "t", "link": "https://x/1"}]},
+    ])
+    assert len(result) == 2
+    assert result[0]["theme"] == ""
+    assert result[0]["heat"] == 1
+    assert result[0]["items"] == []
+    assert result[1]["theme"] == "X"
+    assert result[1]["heat"] == 5
+    assert result[1]["items"] == [{"title": "t", "link": "https://x/1"}]
+
+    html = report.render_map_html(result, "T")
+    assert "https://x/1" in html
+
+
+def test_clean_clusters_none_on_non_list():
+    assert report._clean_clusters({"not": "a list"}) is None
+    assert report._clean_clusters([]) is None

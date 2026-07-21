@@ -135,6 +135,32 @@ def build_weekly(con, cfg, now=None):
     return "\n".join(lines).strip()
 
 
+def _clean_clusters(raw):
+    """Приводит распарсенный JSON от Claude к списку валидных кластеров или None."""
+    if not isinstance(raw, list):
+        return None
+    clusters = []
+    for c in raw:
+        if not isinstance(c, dict):
+            continue
+        theme = c.get("theme")
+        theme = str(theme) if theme is not None else ""
+        try:
+            heat = int(c.get("heat", 1))
+        except (TypeError, ValueError):
+            heat = 1
+        items = []
+        raw_items = c.get("items")
+        if isinstance(raw_items, list):
+            for it in raw_items:
+                if not isinstance(it, dict):
+                    continue
+                items.append({"title": str(it.get("title") or ""),
+                              "link": str(it.get("link") or "")})
+        clusters.append({"theme": theme, "heat": heat, "items": items})
+    return clusters or None
+
+
 def claude_clusters(entries, prompt_path):
     """Тематические кластеры недели (JSON) через headless Claude. Любой сбой → None."""
     if not entries:
@@ -151,7 +177,7 @@ def claude_clusters(entries, prompt_path):
             raw = result.stdout.strip()
             start, end = raw.find("["), raw.rfind("]")
             if start != -1 and end != -1:
-                return json.loads(raw[start:end + 1])
+                return _clean_clusters(json.loads(raw[start:end + 1]))
     except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
         pass
     return None
