@@ -257,7 +257,9 @@ def main():
     if not args.no_fetch:
         import fetch
         try:
-            fetch.run_fetch(cfg=cfg, con=con)
+            _n_new, errors = fetch.run_fetch(cfg=cfg, con=con)
+            for feed, err in errors.items():
+                print("⚠️ {}: {}".format(feed, err), file=sys.stderr)
         except Exception as exc:                       # noqa: BLE001
             print("{} ({})".format(FETCH_ERROR_MSG, exc), file=sys.stderr)
 
