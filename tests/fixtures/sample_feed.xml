@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel>
+  <title>Sample</title>
+  <item>
+    <title>Новые агенты Claude выходят в браузер</title>
+    <link>https://example.com/a1</link>
+    <guid>a1</guid>
+    <pubDate>Mon, 20 Jul 2026 09:00:00 +0000</pubDate>
+    <description>Короткое описание.</description>
+  </item>
+  <item>
+    <title>Framework для агентов</title>
+    <link>https://example.com/a2</link>
+    <guid>a2</guid>
+    <pubDate>Mon, 20 Jul 2026 12:00:00 +0000</pubDate>
+    <description>Ещё описание.</description>
+  </item>
+</channel></rss>
