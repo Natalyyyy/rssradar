@@ -1,0 +1,13 @@
+{
+  "feeds": ["https://example.com/feed", "https://blog.example.org/rss"],
+  "pulse_min_feeds": 2,
+  "pulse_spike_multiplier": 2.0,
+  "pulse_baseline_days": 14,
+  "pulse_window_days": 2,
+  "pulse_cooldown_days": 5,
+  "weekly_window_days": 7,
+  "fetch_limit_cold": 30,
+  "weekly_day": "sun",
+  "weekly_time": "18:00",
+  "pulse_time": "10:00"
+}

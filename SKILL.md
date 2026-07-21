@@ -1,0 +1,54 @@
+---
+name: rssradar
+description: Мониторинг трендов в нише по RSS-фидам с отчётами в Telegram. Триггеры — «настрой RSS-мониторинг», «сделай дайджест по RSS», «проверь RSS-пульс», «покажи карту трендов», «найди фиды по теме», «добавь/убери фид».
+---
+
+# rssradar — трендвотчинг по RSS
+
+Все команды — из папки скилла (`cd` в папку, где лежит этот файл).
+Скрипты: `fetch.py` (сбор), `report.py` (отчёты), `discover.py` (поиск фидов),
+`schedule.py` (расписание).
+
+## Онбординг (первый запуск: нет config.json или .env)
+
+Веди по шагам, по одному вопросу за раз, на русском:
+
+1. **Python 3.9+ и зависимости.** `python3 --version`; затем
+   `python3 -m pip install -r requirements.txt` (feedparser, requests, pymorphy3).
+2. **Источники — два пути:**
+   - *Вручную:* пользователь даёт URL сайтов → для каждого
+     `python3 -c "import discover, json; print(json.dumps(discover.discover('URL')[0]))"`,
+     показать найденные фиды, подтверждённые записать в `config.json` → `feeds`.
+   - *По теме:* пользователь называет тему → ты ищешь сайты-кандидаты
+     (через exa `exa-core:search`, если он установлен, иначе `WebSearch`),
+     каждого прогоняешь через `discover.discover`, показываешь выверенный
+     список, подтверждённые фиды пишешь в `config.json`.
+3. **Telegram.** Бот: @BotFather → /newbot → токен. chat_id: пользователь пишет
+   боту, затем `curl https://api.telegram.org/bot<TOKEN>/getUpdates` →
+   `message.chat.id`. Записать в `.env` (`TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`).
+4. **Холодный старт.** `python3 fetch.py --limit 30` — показать, сколько
+   собралось и какие фиды не открылись.
+5. **Режим.** Спроси: ручной запуск, недельный дайджест, пульс или всё сразу.
+   Для автоматики — `python3 schedule.py install` (предупреди: недельный
+   дайджест запускает headless Claude и тратит лимиты подписки).
+
+## Ручные команды
+
+- «сделай дайджест по RSS» → `python3 report.py weekly` (показать; отправить —
+  с `--send`)
+- «проверь пульс» → `python3 report.py pulse` (аналогично)
+- «покажи карту трендов» → `python3 report.py map` (пишет HTML в data/ и
+  открывает в браузере)
+- «найди фиды по теме X» → discover-флоу (шаг 2), дописать в `config.json`
+- «добавь фид URL» → проверить `discover.is_valid_feed`, дописать в `config.json`,
+  затем `python3 fetch.py --limit 30`
+- «убери фид URL» → удалить из `config.json`
+- «выключи/включи автоматику» → `python3 schedule.py remove` / `install`
+- «как там мониторинг» → `python3 schedule.py status`
+
+## Важно
+
+- Пульс молчит первые `pulse_baseline_days` дней — копится базовая линия. Это норма.
+- В каждой строке отчёта со статьёй — ссылка (зашито в код, не переписывай форматтеры).
+- Секреты только в `.env`, не в config.json и не в git.
+- Лемматизация пульса — RU (pymorphy3); без него пульс шумит на формах слов.
