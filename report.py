@@ -24,11 +24,10 @@ def pulse_signals(con, cfg, now=None):
     now = now or common.now_utc()
     if common.data_span_days(con, now) < cfg["pulse_baseline_days"]:
         return []                                  # базовой линии ещё нет
-    window_start = (now - timedelta(days=cfg["pulse_window_days"])).strftime("%Y-%m-%d")
-    baseline_start = (now - timedelta(days=cfg["pulse_baseline_days"]
-                                      + cfg["pulse_window_days"])).strftime("%Y-%m-%d")
     win_days = max(cfg["pulse_window_days"], 1)
     base_days = max(cfg["pulse_baseline_days"], 1)
+    window_start = (now - timedelta(days=win_days - 1)).strftime("%Y-%m-%d")
+    baseline_start = (now - timedelta(days=win_days - 1 + base_days)).strftime("%Y-%m-%d")
     signals = []
     terms = [r["term"] for r in con.execute(
         "SELECT DISTINCT term FROM term_counts WHERE day >= ?", (window_start,))]
