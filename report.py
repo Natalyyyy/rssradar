@@ -1,7 +1,10 @@
 """Отчёты rssradar: пульс (всплеск объёма), недельный дайджест, карта."""
 import argparse
+import html as html_lib
+import json
 import subprocess
 import sys
+import webbrowser
 from datetime import timedelta
 from pathlib import Path
 
@@ -130,3 +133,82 @@ def build_weekly(con, cfg, now=None):
         title = " ".join((e["title"] or "").split())
         lines.append("• {} — {}".format(title, e["link"]))
     return "\n".join(lines).strip()
+
+
+def claude_clusters(entries, prompt_path):
+    """Тематические кластеры недели (JSON) через headless Claude. Любой сбой → None."""
+    if not entries:
+        return None
+    digest = ["- {} — {}".format(" ".join((e["title"] or "").split()), e["link"])
+              for e in entries]
+    try:
+        prompt = Path(prompt_path).read_text(encoding="utf-8") + "\n\n" + "\n".join(digest)
+        result = subprocess.run(
+            ["claude", "-p", "--output-format", "text"],
+            input=prompt, capture_output=True, text=True, timeout=300,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            raw = result.stdout.strip()
+            start, end = raw.find("["), raw.rfind("]")
+            if start != -1 and end != -1:
+                return json.loads(raw[start:end + 1])
+    except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
+        pass
+    return None
+
+
+def render_map_html(clusters, title):
+    esc = html_lib.escape
+    if not clusters:
+        body = "<p class='empty'>Пока нет данных для карты.</p>"
+    else:
+        cards = []
+        for c in clusters:
+            heat = max(1, min(int(c.get("heat", 1)), 6))
+            items = "".join(
+                "<li><a href='{}'>{}</a></li>".format(
+                    esc(i.get("link", "")), esc(i.get("title", "")))
+                for i in c.get("items", []))
+            cards.append(
+                "<section class='card heat-{h}'><h2>{t}</h2><ul>{i}</ul></section>".format(
+                    h=heat, t=esc(c.get("theme", "")), i=items))
+        body = "<div class='grid'>" + "".join(cards) + "</div>"
+    return """<!doctype html><html lang='ru'><head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>{title}</title><style>
+:root{{color-scheme:light dark}}
+body{{font:16px/1.5 -apple-system,system-ui,sans-serif;margin:2rem;max-width:1100px}}
+h1{{font-size:1.4rem}}
+.grid{{display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-start}}
+.card{{border:1px solid color-mix(in srgb, currentColor 20%, transparent);
+  border-radius:12px;padding:1rem;flex:1 1 240px}}
+.card h2{{margin:.2rem 0 .6rem;font-size:1.05rem}}
+.heat-6{{flex-basis:420px}} .heat-5{{flex-basis:360px}} .heat-4{{flex-basis:320px}}
+.heat-3{{flex-basis:280px}} .heat-2{{flex-basis:240px}} .heat-1{{flex-basis:220px}}
+.heat-6 h2::before,.heat-5 h2::before,.heat-4 h2::before{{content:'🔥 '}}
+ul{{margin:0;padding-left:1.1rem}} a{{color:inherit}}
+.empty{{opacity:.6}}
+</style></head><body><h1>{title}</h1>{body}</body></html>""".format(
+        title=esc(title), body=body)
+
+
+def write_and_open(html):
+    common.DATA_DIR.mkdir(parents=True, exist_ok=True)
+    path = common.DATA_DIR / "map-{}.html".format(common.day_of(common.now_utc()))
+    path.write_text(html, encoding="utf-8")
+    try:
+        webbrowser.open(path.as_uri())
+    except Exception:                          # noqa: BLE001 — headless-среда
+        pass
+    return path
+
+
+def build_map(con, cfg, now=None):
+    entries = weekly_entries(con, cfg, now=now)
+    clusters = claude_clusters(entries, common.ROOT / "prompts" / "map.md")
+    if clusters is None:                       # фолбэк: одна тема-свалка
+        clusters = [{"theme": "Новое за неделю", "heat": 3,
+                     "items": [{"title": e["title"], "link": e["link"]}
+                               for e in entries]}] if entries else []
+    html = render_map_html(clusters, "RSS-карта трендов")
+    return str(write_and_open(html))
