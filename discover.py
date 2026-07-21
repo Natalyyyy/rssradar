@@ -33,10 +33,12 @@ def feed_links_in_html(base_url, html):
 
 def is_valid_feed(url):
     try:
-        parsed = feedparser.parse(url)
-    except Exception:                       # noqa: BLE001
+        resp = requests.get(url, timeout=15, headers={"User-Agent": "rssradar/1.0"})
+        resp.raise_for_status()
+        parsed = feedparser.parse(resp.content)
+    except Exception:                       # noqa: BLE001 — сеть/парсер
         return False
-    return bool(parsed.entries) and not (getattr(parsed, "bozo", 0) and not parsed.entries)
+    return bool(parsed.entries)
 
 
 def discover(site_url):
@@ -46,9 +48,9 @@ def discover(site_url):
                             headers={"User-Agent": "rssradar/1.0"})
         resp.raise_for_status()
         html = resp.text
-    except requests.RequestException as exc:
+    except requests.RequestException:
         html = ""
-        errors[site_url] = "сайт недоступен: {}".format(exc)
+        errors[site_url] = "сайт недоступен"
     for candidate in feed_links_in_html(site_url, html):
         if candidate in feeds:
             continue
