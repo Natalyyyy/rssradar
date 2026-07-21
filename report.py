@@ -1,7 +1,9 @@
 """Отчёты rssradar: пульс (всплеск объёма), недельный дайджест, карта."""
 import argparse
+import subprocess
 import sys
 from datetime import timedelta
+from pathlib import Path
 
 import common
 
@@ -70,4 +72,61 @@ def format_pulse(signals):
         for title, link in s["links"]:
             lines.append("  {}".format(link))
         lines.append("")
+    return "\n".join(lines).strip()
+
+
+def _norm_link(link):
+    return (link or "").split("?")[0].rstrip("/").lower()
+
+
+def weekly_entries(con, cfg, now=None):
+    now = now or common.now_utc()
+    since = (now - timedelta(days=cfg["weekly_window_days"])).isoformat()
+    rows = con.execute(
+        "SELECT feed_url, title, link, published, summary, first_seen "
+        "FROM entries WHERE first_seen >= ? ORDER BY first_seen DESC", (since,)
+    ).fetchall()
+    seen, out = set(), []
+    for r in rows:
+        key = _norm_link(r["link"])
+        if key and key in seen:
+            continue
+        seen.add(key)
+        out.append(dict(r))
+    return out
+
+
+def claude_summary(entries, prompt_path):
+    """Тематический дайджест недели через headless Claude. Любой сбой → None."""
+    if not entries:
+        return None
+    digest = []
+    for e in entries:
+        title = " ".join((e["title"] or "").split())
+        digest.append("- {} — {}".format(title, e["link"]))
+    prompt = Path(prompt_path).read_text(encoding="utf-8") + "\n\n" + "\n".join(digest)
+    try:
+        result = subprocess.run(
+            ["claude", "-p", "--output-format", "text"],
+            input=prompt, capture_output=True, text=True, timeout=300,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return None
+
+
+def build_weekly(con, cfg, now=None):
+    entries = weekly_entries(con, cfg, now=now)
+    header = "📰 RSS за неделю"
+    if not entries:
+        return header + "\n\nЗа неделю новых статей не появилось."
+    summary = claude_summary(entries, common.ROOT / "prompts" / "weekly.md")
+    if summary:
+        return "{}\n\n{}".format(header, summary)
+    lines = [header, "", "Новое за неделю:"]           # фолбэк без Claude
+    for e in entries:
+        title = " ".join((e["title"] or "").split())
+        lines.append("• {} — {}".format(title, e["link"]))
     return "\n".join(lines).strip()
