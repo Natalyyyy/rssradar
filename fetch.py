@@ -5,8 +5,12 @@ from calendar import timegm
 from datetime import datetime, timezone
 
 import feedparser
+import requests
 
 import common
+
+_USER_AGENT = {"User-Agent": "rssradar/1.0"}
+_TIMEOUT = 30
 
 
 def _entry_date(e):
@@ -34,8 +38,25 @@ def entries_from_parsed(feed_url, parsed):
 
 
 def _parse(url, etag, modified):
-    """Обёртка над feedparser.parse с условным запросом. Отдельно — чтобы мокать."""
-    return feedparser.parse(url, etag=etag, modified=modified)
+    """Качает фид через requests (таймаут + HTTP-статус — feedparser.parse(url)
+    сам таймаута не имеет и может зависнуть навсегда), затем парсит content.
+    Отдельная функция — чтобы мокать в тестах."""
+    headers = dict(_USER_AGENT)
+    if etag:
+        headers["If-None-Match"] = etag
+    if modified:
+        headers["If-Modified-Since"] = modified
+    resp = requests.get(url, timeout=_TIMEOUT, headers=headers)
+    if resp.status_code == 304:
+        parsed = feedparser.FeedParserDict()
+        parsed["bozo"] = 0
+        parsed["entries"] = []
+    else:
+        parsed = feedparser.parse(resp.content)
+    parsed["status"] = resp.status_code
+    parsed["etag"] = resp.headers.get("ETag") or etag
+    parsed["modified"] = resp.headers.get("Last-Modified") or modified
+    return parsed
 
 
 def fetch_feed(con, feed_url):
@@ -46,6 +67,10 @@ def fetch_feed(con, feed_url):
         common.set_feed_status(con, feed_url,
                                etag=etag, modified=modified)
         return [], None
+    if status is not None and status >= 400:
+        # HTTP-ошибка: тело (даже если распарсилось) не считаем валидным фидом,
+        # иначе 404-страница с XML-подобным телом маскируется под last_ok.
+        return [], "HTTP {}".format(status)
     if getattr(parsed, "bozo", 0) and not parsed.entries:
         return [], "не удалось разобрать фид"
     records = entries_from_parsed(feed_url, parsed)
