@@ -187,6 +187,15 @@ def set_feed_status(con, feed_url, etag=None, modified=None, error=None):
     con.commit()
 
 
+def failed_feeds(con):
+    """Фиды, последний прогон fetch которых закончился ошибкой (last_error IS NOT NULL).
+    После успешного повторного фетча set_feed_status чистит last_error → список актуальный."""
+    rows = con.execute(
+        "SELECT feed_url, last_error FROM feed_status WHERE last_error IS NOT NULL"
+    ).fetchall()
+    return [(r["feed_url"], r["last_error"]) for r in rows]
+
+
 def data_span_days(con, now=None):
     row = con.execute("SELECT MIN(day) AS lo, MAX(day) AS hi FROM term_counts").fetchone()
     if not row or not row["lo"]:

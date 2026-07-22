@@ -15,6 +15,19 @@ def test_main_surfaces_fetch_errors(monkeypatch, capsys):
     assert "http://x/feed" in err and "boom" in err
 
 
+def test_main_weekly_prints_failed_feeds_footer(monkeypatch, capsys):
+    real_connect = common.connect
+    con = real_connect(":memory:")
+    common.set_feed_status(con, "https://broken/feed", error="HTTP 404")
+    monkeypatch.setattr(common, "connect", lambda: con)
+    monkeypatch.setattr(fetch, "run_fetch", lambda cfg, con: (0, {}))
+    monkeypatch.setattr(report, "build_weekly", lambda con, cfg: "📰 RSS за неделю\n\nПусто.")
+    monkeypatch.setattr(sys, "argv", ["report.py", "weekly"])
+    report.main()
+    out = capsys.readouterr().out
+    assert "⚠️" in out and "https://broken/feed" in out
+
+
 def test_main_pulse_marks_alerted(monkeypatch, capsys):
     real_connect = common.connect
     monkeypatch.setattr(common, "connect", lambda: real_connect(":memory:"))

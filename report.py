@@ -2,6 +2,7 @@
 import argparse
 import html as html_lib
 import json
+import shutil
 import subprocess
 import sys
 import webbrowser
@@ -10,11 +11,24 @@ from pathlib import Path
 
 import common
 
+CLAUDE_MISSING_MSG = "⚠️ claude CLI не найден в PATH — дайджест собран без Claude."
+
+
+def _claude_bin():
+    """Абсолютный путь к claude CLI или None. Под launchd PATH минимальный,
+    поэтому зовём по голому имени 'claude' нельзя — резолвим явно."""
+    return shutil.which("claude")
+
 
 def term_links(con, term, since_day, limit=3):
+    # Критерий окна — как у пульса: по published (с фолбэком на first_seen,
+    # см. common.record_terms), а не по first_seen напрямую — иначе сигнал
+    # может прийти с пустым списком ссылок.
     rows = con.execute(
-        "SELECT title, link FROM entries WHERE first_seen >= ? "
-        "ORDER BY first_seen DESC", (since_day,)
+        "SELECT title, link FROM entries "
+        "WHERE COALESCE(NULLIF(substr(published, 1, 10), ''), substr(first_seen, 1, 10)) >= ? "
+        "ORDER BY COALESCE(NULLIF(published, ''), first_seen) DESC",
+        (since_day,)
     ).fetchall()
     out = []
     for r in rows:
@@ -78,6 +92,16 @@ def format_pulse(signals):
     return "\n".join(lines).strip()
 
 
+def format_failed_feeds(con):
+    """Строка-предупреждение о фидах, не ответивших на последнем сборе.
+    Пусто, если все фиды в порядке — чтобы не засорять отчёт лишний раз."""
+    failed = common.failed_feeds(con)
+    if not failed:
+        return ""
+    names = ", ".join(url for url, _ in failed)
+    return "\n\n⚠️ {} фидов не ответили: {}".format(len(failed), names)
+
+
 def _norm_link(link):
     return (link or "").split("?")[0].rstrip("/").lower()
 
@@ -103,6 +127,9 @@ def claude_summary(entries, prompt_path):
     """Тематический дайджест недели через headless Claude. Любой сбой → None."""
     if not entries:
         return None
+    claude_bin = _claude_bin()
+    if not claude_bin:
+        return None
     digest = []
     for e in entries:
         title = " ".join((e["title"] or "").split())
@@ -110,7 +137,7 @@ def claude_summary(entries, prompt_path):
     try:
         prompt = Path(prompt_path).read_text(encoding="utf-8") + "\n\n" + "\n".join(digest)
         result = subprocess.run(
-            ["claude", "-p", "--output-format", "text"],
+            [claude_bin, "-p", "--output-format", "text"],
             input=prompt, capture_output=True, text=True, timeout=300,
         )
         if result.returncode == 0 and result.stdout.strip():
@@ -125,10 +152,14 @@ def build_weekly(con, cfg, now=None):
     header = "📰 RSS за неделю"
     if not entries:
         return header + "\n\nЗа неделю новых статей не появилось."
+    claude_missing = _claude_bin() is None
     summary = claude_summary(entries, common.ROOT / "prompts" / "weekly.md")
     if summary:
         return "{}\n\n{}".format(header, summary)
-    lines = [header, "", "Новое за неделю:"]           # фолбэк без Claude
+    lines = [header]
+    if claude_missing:                                  # не молча фолбэкаем — говорим прямо
+        lines.append(CLAUDE_MISSING_MSG)
+    lines += ["", "Новое за неделю:"]                   # фолбэк без Claude
     for e in entries:
         title = " ".join((e["title"] or "").split())
         lines.append("• {} — {}".format(title, e["link"]))
@@ -165,12 +196,15 @@ def claude_clusters(entries, prompt_path):
     """Тематические кластеры недели (JSON) через headless Claude. Любой сбой → None."""
     if not entries:
         return None
+    claude_bin = _claude_bin()
+    if not claude_bin:
+        return None
     digest = ["- {} — {}".format(" ".join((e["title"] or "").split()), e["link"])
               for e in entries]
     try:
         prompt = Path(prompt_path).read_text(encoding="utf-8") + "\n\n" + "\n".join(digest)
         result = subprocess.run(
-            ["claude", "-p", "--output-format", "text"],
+            [claude_bin, "-p", "--output-format", "text"],
             input=prompt, capture_output=True, text=True, timeout=300,
         )
         if result.returncode == 0 and result.stdout.strip():
@@ -241,9 +275,13 @@ def write_and_open(html):
 
 def build_map(con, cfg, now=None):
     entries = weekly_entries(con, cfg, now=now)
+    claude_missing = _claude_bin() is None
     clusters = claude_clusters(entries, common.ROOT / "prompts" / "map.md")
     if clusters is None:                       # фолбэк: одна тема-свалка
-        clusters = [{"theme": "Новое за неделю", "heat": 3,
+        theme = "Новое за неделю"
+        if claude_missing and entries:         # не молча фолбэкаем — говорим прямо
+            theme = "Новое за неделю (без Claude — claude CLI не найден в PATH)"
+        clusters = [{"theme": theme, "heat": 3,
                      "items": [{"title": e["title"], "link": e["link"]}
                                for e in entries]}] if entries else []
     html = render_map_html(clusters, "RSS-карта трендов")
@@ -283,10 +321,10 @@ def main():
         if not signals:
             print("Тихо: всплесков нет.")
             return
-        text = format_pulse(signals)
+        text = format_pulse(signals) + format_failed_feeds(con)
         common.mark_alerted(con, [s["term"] for s in signals])
     elif args.mode == "weekly":
-        text = build_weekly(con, cfg)
+        text = build_weekly(con, cfg) + format_failed_feeds(con)
     else:
         path = build_map(con, cfg)
         text = "🗺 Карта трендов собрана: {}".format(path)
