@@ -1,5 +1,6 @@
 """Расписание rssradar: launchd (Mac) или cron (Linux)."""
 import argparse
+import os
 import platform
 import subprocess
 import sys
@@ -22,6 +23,13 @@ def _python():
     return sys.executable or "python3"
 
 
+def _launchd_path():
+    """PATH из среды, где ставится расписание (обычный шелл с homebrew/npm/nvm),
+    чтобы под launchd (минимальный PATH) находился 'claude' и прочие бинари."""
+    from xml.sax.saxutils import escape
+    return escape(os.environ.get("PATH", "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"))
+
+
 def plist_xml(label, mode, hour, minute, weekday=None):
     weekday_xml = ("<key>Weekday</key><integer>{}</integer>".format(weekday)
                    if weekday is not None else "")
@@ -35,6 +43,9 @@ def plist_xml(label, mode, hour, minute, weekday=None):
     <string>{mode}</string>
     <string>--send</string>
   </array>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>{path}</string>
+  </dict>
   <key>StartCalendarInterval</key><dict>
     <key>Hour</key><integer>{hour}</integer>
     <key>Minute</key><integer>{minute}</integer>
@@ -45,6 +56,7 @@ def plist_xml(label, mode, hour, minute, weekday=None):
 </dict></plist>
 """.format(label=label, python=_python(), report=common.ROOT / "report.py",
            mode=mode, hour=hour, minute=minute, weekday_xml=weekday_xml,
+           path=_launchd_path(),
            log=common.DATA_DIR / (mode + ".log"),
            errlog=common.DATA_DIR / (mode + ".err.log"))
 
