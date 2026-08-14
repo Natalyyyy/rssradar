@@ -5,6 +5,12 @@ MAX_LEN = 4000  # лимит API 4096, оставляем запас
 
 
 def split_message(text, max_len=MAX_LEN):
+    """Режет текст на чанки по границам строк, каждый не длиннее max_len.
+
+    Строка длиннее max_len режется жёстко на куски по max_len символов —
+    они уходят как отдельные последовательные сообщения в Telegram, поэтому
+    внутри такой строки может появиться видимая граница сообщения.
+    """
     if len(text) <= max_len:
         return [text]
     chunks, current = [], ""
@@ -13,7 +19,7 @@ def split_message(text, max_len=MAX_LEN):
         if len(candidate) > max_len:
             if current:
                 chunks.append(current)
-            while len(line) > max_len:
+            while len(line) > max_len:  # сверхдлинная строка — режем жёстко
                 chunks.append(line[:max_len])
                 line = line[max_len:]
             current = line
