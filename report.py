@@ -1,4 +1,5 @@
 """Отчёты rssradar: пульс (всплеск объёма), недельный дайджест, карта."""
+import os
 import argparse
 import html as html_lib
 import json
@@ -10,6 +11,26 @@ from datetime import timedelta
 from pathlib import Path
 
 import common
+
+
+# --- модель ходит без токенов (security-ревью 29.08.2026) -------------------
+# В окружении прогона лежат ключи, и процесс модели наследовал их все: инъекция
+# из недоверенного текста, дотянувшаяся до исполнения, забирала их одной
+# строкой. Модели они не нужны — сеть за неё делают скрипты.
+# CLAUDE_CODE_OAUTH_TOKEN намеренно НЕ снимаем: им логинится сам CLI.
+_СЕКРЕТЫ_МИМО_МОДЕЛИ = (
+    "TELEGRAM_BOT_TOKEN", "TELEGRAM_TOKEN", "TELEGRAPH_TOKEN", "TGSTAT_TOKEN",
+    "APIFY_TOKEN", "IG_ACCESS_TOKEN", "GROQ_API_KEY", "HEALTH_BOT_TOKEN",
+    "GCAL_SA", "DASHBOARD_AUTH", "GRANOLA_API_KEY",
+)
+
+
+def _env_без_секретов(base=None):
+    env = dict(base if base is not None else os.environ)
+    for имя in _СЕКРЕТЫ_МИМО_МОДЕЛИ:
+        env.pop(имя, None)
+    return env
+
 
 CLAUDE_MISSING_MSG = "⚠️ claude CLI не найден в PATH — дайджест собран без Claude."
 
@@ -136,9 +157,17 @@ def claude_summary(entries, prompt_path):
         digest.append("- {} — {}".format(title, e["link"]))
     try:
         prompt = Path(prompt_path).read_text(encoding="utf-8") + "\n\n" + "\n".join(digest)
+        # Набор инструментов пустой: заголовки лент уже в промпте, файлы не
+        # нужны. Вход недоверенный — произвольные внешние RSS
+        # (security-ревью 29.08.2026). Модель прибита явно: дефолт CLI разный
+        # на разных машинах.
         result = subprocess.run(
-            [claude_bin, "-p", "--output-format", "text"],
-            input=prompt, capture_output=True, text=True, timeout=300,
+            [claude_bin, "-p", "--output-format", "text",
+             "--model", "claude-opus-5",
+             "--tools", "",
+             "--disallowedTools", "Bash,Monitor,BashOutput,KillShell,Task,Agent,WebFetch,WebSearch,NotebookEdit,Read,Write,Edit"],
+            input=prompt, env=_env_без_секретов(),
+            capture_output=True, text=True, timeout=300,
         )
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
@@ -310,7 +339,7 @@ def main():
     if not args.no_fetch:
         import fetch
         try:
-            _n_new, errors = fetch.run_fetch(cfg=cfg, con=con)
+            _n_new, errors = fetch.collect(cfg=cfg, con=con)
             for feed, err in errors.items():
                 print("⚠️ {}: {}".format(feed, err), file=sys.stderr)
         except Exception as exc:                       # noqa: BLE001
