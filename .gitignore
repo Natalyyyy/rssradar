@@ -3,3 +3,11 @@ data/
 venv/
 __pycache__/
 *.pyc
+config.json
+
+# Секреты и их резервные копии (аудит 2026-09-12)
+.env
+.env.*
+*.bak
+*.bak-*
+!/.env.example
