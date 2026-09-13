@@ -1,0 +1,115 @@
+"""Сайты без RSS → те же entries в базе rssradar.
+
+Anthropic (news / engineering / research) фида не отдаёт, а это главный
+первоисточник ниши. Тянем карточки со страниц-индексов и кладём в ту же
+таблицу entries, что и обычные фиды — report.py их не отличает.
+
+Запуск: python3 scrape_sites.py [--limit 30]
+"""
+from __future__ import annotations
+
+import argparse
+import html as html_mod
+import re
+import sys
+from datetime import datetime, timezone
+
+import requests
+
+import common
+
+UA = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+                    "(KHTML, like Gecko) Chrome/120 Safari/537.36"}
+TIMEOUT = 30
+
+SITES = [
+    ("scrape:anthropic/news",        "https://www.anthropic.com/news",        "news"),
+    ("scrape:anthropic/engineering", "https://www.anthropic.com/engineering", "engineering"),
+    ("scrape:anthropic/research",    "https://www.anthropic.com/research",    "research"),
+]
+
+WINDOW = 2000          # сколько символов после ссылки просматриваем в поисках заголовка/даты
+# заголовок карточки — либо <h1>..<h6>, либо <span class="...__title ...">
+TITLE_RE = re.compile(
+    r"<h[1-6][^>]*>(.*?)</h[1-6]>|<span[^>]*__title[^>]*>(.*?)</span>", re.DOTALL)
+DATE_RE = re.compile(r"(?:<time[^>]*>|__date[^\"]*\">)([A-Z][a-z]{2}\s+\d{1,2},\s+\d{4})<")
+TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _text(raw: str) -> str:
+    return html_mod.unescape(TAG_RE.sub("", raw)).strip()
+
+
+def _iso(date_str: str) -> str:
+    try:
+        return datetime.strptime(date_str, "%b %d, %Y").replace(tzinfo=timezone.utc).isoformat()
+    except ValueError:
+        return ""
+
+
+def parse_index(html: str, section: str, base="https://www.anthropic.com") -> list[dict]:
+    """Карточки со страницы-индекса: ссылка + ближайшие за ней заголовок и дата."""
+    out, seen = [], set()
+    for m in re.finditer(r'href="(/%s/[a-z0-9\-]+)"' % section, html):
+        slug = m.group(1)
+        if slug in seen:
+            continue
+        tail = html[m.end():m.end() + WINDOW]
+        tm = TITLE_RE.search(tail)
+        if not tm:
+            continue
+        title = _text(tm.group(1) or tm.group(2) or "")
+        if not title:
+            continue
+        seen.add(slug)
+        dm = DATE_RE.search(tail)
+        out.append({
+            "feed_url": "scrape:anthropic/%s" % section,
+            "entry_id": base + slug,
+            "title": title,
+            "link": base + slug,
+            "published": _iso(dm.group(1)) if dm else "",
+            "summary": "",
+        })
+    return out
+
+
+def run_scrape(con=None, limit=None):
+    """Скрейп всех SITES в базу. Возвращает (новых записей, {feed_url: ошибка})."""
+    con = con or common.connect()
+    n_new, errors = 0, {}
+    for feed_url, url, section in SITES:
+        try:
+            resp = requests.get(url, timeout=TIMEOUT, headers=UA)
+            resp.raise_for_status()
+            records = parse_index(resp.text, section)
+        except Exception as exc:                       # noqa: BLE001 — сеть/парсер
+            errors[feed_url] = str(exc)
+            common.set_feed_status(con, feed_url, error=str(exc))
+            continue
+        if not records:                                # разметка страницы поехала
+            errors[feed_url] = "карточки не распарсились"
+            common.set_feed_status(con, feed_url, error="карточки не распарсились")
+            continue
+        if limit:
+            records = records[:limit]
+        n_new += common.save_entries(con, records)
+        common.record_terms(con, records)
+        common.set_feed_status(con, feed_url)
+    return n_new, errors
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--limit", type=int, default=None,
+                    help="ограничить число карточек со страницы (холодный старт, напр. 30)")
+    args = ap.parse_args()
+    n_new, errors = run_scrape(limit=args.limit)
+    print("Новых записей: %d" % n_new)
+    for feed, e in errors.items():
+        print("⚠️ %s: %s" % (feed, e), file=sys.stderr)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
