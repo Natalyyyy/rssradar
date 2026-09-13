@@ -102,6 +102,17 @@ def run_fetch(cfg=None, con=None, limit=None):
     return n_new, errors
 
 
+def collect(cfg=None, con=None, limit=None):
+    """Полный сбор: RSS-фиды + сайты без RSS (Anthropic). Точка входа для
+    fetch.py и report.py — run_fetch остаётся чисто про фиды."""
+    cfg = cfg or common.load_config()
+    con = con or common.connect()
+    n_new, errors = run_fetch(cfg=cfg, con=con, limit=limit)
+    import scrape_sites
+    s_new, s_errors = scrape_sites.run_scrape(con=con, limit=limit)
+    return n_new + s_new, {**errors, **s_errors}
+
+
 def main():
     ap = argparse.ArgumentParser(description="Сбор RSS-фидов в базу rssradar")
     ap.add_argument("--limit", type=int, default=None,
@@ -112,7 +123,7 @@ def main():
     except common.ConfigError as exc:
         print(str(exc), file=sys.stderr)
         sys.exit(1)
-    n_new, errors = run_fetch(cfg=cfg, limit=args.limit)
+    n_new, errors = collect(cfg=cfg, limit=args.limit)
     print("Новых записей: {}".format(n_new))
     for feed, e in errors.items():
         print("⚠️ {}: {}".format(feed, e), file=sys.stderr)
