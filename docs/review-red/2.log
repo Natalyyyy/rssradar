@@ -1,0 +1,79 @@
+FF....                                                                   [100%]
+=================================== FAILURES ===================================
+_______ test_fetch_rolls_back_cache_and_records_on_write_error[entries] ________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1080a69e0>
+table = 'entries'
+
+    @pytest.mark.parametrize("table", ["entries", "term_counts"])
+    def test_fetch_rolls_back_cache_and_records_on_write_error(monkeypatch, table):
+        con = common.connect(":memory:")
+        common.set_feed_status(con, "feed", etag="old", modified="old-date")
+        con.execute("CREATE TRIGGER fail_write BEFORE INSERT ON " + table +
+                    " BEGIN SELECT RAISE(ABORT, 'disk failure'); END")
+        monkeypatch.setattr(fetch.requests, "get", lambda *a, **k:
+                            FakeResponse(200, FIXTURE.read_bytes(), {"ETag": "new"}))
+        try:
+            fetch.run_fetch({"feeds": ["feed"]}, con)
+        except sqlite3.DatabaseError:
+            pass
+>       assert common.get_feed_cache(con, "feed") == ("old", "old-date")
+E       AssertionError: assert ('new', 'old-date') == ('old', 'old-date')
+E         
+E         At index 0 diff: 'new' != 'old'
+E         Use -v to get more diff
+
+tests/test_review_transactions.py:20: AssertionError
+_____ test_fetch_rolls_back_cache_and_records_on_write_error[term_counts] ______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1080a6780>
+table = 'term_counts'
+
+    @pytest.mark.parametrize("table", ["entries", "term_counts"])
+    def test_fetch_rolls_back_cache_and_records_on_write_error(monkeypatch, table):
+        con = common.connect(":memory:")
+        common.set_feed_status(con, "feed", etag="old", modified="old-date")
+        con.execute("CREATE TRIGGER fail_write BEFORE INSERT ON " + table +
+                    " BEGIN SELECT RAISE(ABORT, 'disk failure'); END")
+        monkeypatch.setattr(fetch.requests, "get", lambda *a, **k:
+                            FakeResponse(200, FIXTURE.read_bytes(), {"ETag": "new"}))
+        try:
+            fetch.run_fetch({"feeds": ["feed"]}, con)
+        except sqlite3.DatabaseError:
+            pass
+>       assert common.get_feed_cache(con, "feed") == ("old", "old-date")
+E       AssertionError: assert ('new', 'old-date') == ('old', 'old-date')
+E         
+E         At index 0 diff: 'new' != 'old'
+E         Use -v to get more diff
+
+tests/test_review_transactions.py:20: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_review_transactions.py::test_fetch_rolls_back_cache_and_records_on_write_error[entries]
+FAILED tests/test_review_transactions.py::test_fetch_rolls_back_cache_and_records_on_write_error[term_counts]
+2 failed, 4 passed in 0.07s
+F                                                                        [100%]
+=================================== FAILURES ===================================
+__________ test_scrape_rolls_back_entries_when_terms_cannot_be_saved ___________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10b8e28b0>
+
+    def test_scrape_rolls_back_entries_when_terms_cannot_be_saved(monkeypatch):
+        import scrape_sites
+        from tests.test_scrape_sites import NEWS_HTML, _Resp
+        con = common.connect(":memory:")
+        con.execute("CREATE TRIGGER fail_write BEFORE INSERT ON term_counts "
+                    "BEGIN SELECT RAISE(ABORT, 'disk failure'); END")
+        monkeypatch.setattr(scrape_sites.requests, "get", lambda *a, **k: _Resp(NEWS_HTML))
+        monkeypatch.setattr(scrape_sites, "SITES", [("scrape:anthropic/news", "https://x", "news")])
+        try:
+            scrape_sites.run_scrape(con)
+        except sqlite3.DatabaseError:
+            pass
+>       assert con.execute("SELECT count(*) FROM entries").fetchone()[0] == 0
+E       assert 2 == 0
+
+tests/test_review_transactions.py:62: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_review_transactions.py::test_scrape_rolls_back_entries_when_terms_cannot_be_saved
+1 failed, 6 deselected in 0.47s

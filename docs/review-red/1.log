@@ -1,0 +1,85 @@
+FFF.                                                                     [100%]
+=================================== FAILURES ===================================
+_________________ test_preview_twice_never_suppresses_delivery _________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x107547e10>
+
+    def test_preview_twice_never_suppresses_delivery(monkeypatch):
+        seed_pulse()
+        monkeypatch.setattr(sys, "argv", ["report.py", "pulse", "--no-fetch"])
+        report.main()
+        report.main()
+        con = common.connect()
+>       assert con.execute("SELECT count(*) FROM pulse_alerts").fetchone()[0] == 0
+E       assert 1 == 0
+
+tests/test_review_pulse_delivery.py:35: AssertionError
+----------------------------- Captured stdout call -----------------------------
+🔥 RSS-пульс: темы набирают обороты
+
+• agent — ∞ к базовой линии, в 2 источниках
+Тихо: всплесков нет.
+_________________ test_delivery_error_does_not_start_cooldown __________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x107547bb0>
+
+    def test_delivery_error_does_not_start_cooldown(monkeypatch):
+        seed_pulse()
+        def fail(*a, **k):
+            raise requests.HTTPError("HTTP 500")
+        monkeypatch.setattr(requests, "post", fail)
+        monkeypatch.setattr(sys, "argv", ["report.py", "pulse", "--send", "--no-fetch"])
+        with pytest.raises(requests.HTTPError):
+            report.main()
+        con = common.connect()
+>       assert con.execute("SELECT count(*) FROM pulse_alerts").fetchone()[0] == 0
+E       assert 1 == 0
+
+tests/test_review_pulse_delivery.py:48: AssertionError
+----------------------------- Captured stdout call -----------------------------
+🔥 RSS-пульс: темы набирают обороты
+
+• agent — ∞ к базовой линии, в 2 источниках
+_________ test_success_marks_only_after_send_and_second_run_is_silent __________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10759b410>
+
+    def test_success_marks_only_after_send_and_second_run_is_silent(monkeypatch):
+        seed_pulse()
+        calls = []
+        def post(*a, **k):
+            con = common.connect()
+            assert con.execute("SELECT count(*) FROM pulse_alerts").fetchone()[0] == 0
+            con.close()
+            calls.append(k["json"]["text"])
+            return Success()
+        monkeypatch.setattr(requests, "post", post)
+        monkeypatch.setattr(sys, "argv", ["report.py", "pulse", "--send", "--no-fetch"])
+>       report.main()
+
+tests/test_review_pulse_delivery.py:63: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+report.py:378: in main
+    telegram.send(text, env["TELEGRAM_TOKEN"], env["TELEGRAM_CHAT_ID"])
+telegram.py:35: in send
+    resp = requests.post(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('https://api.telegram.org/bottest/sendMessage',)
+k = {'json': {'chat_id': '123', 'text': '🔥 RSS-пульс: темы набирают обороты\n\n• agent — ∞ к базовой линии, в 2 источниках', 'disable_web_page_preview': True}, 'timeout': 30}
+
+    def post(*a, **k):
+        con = common.connect()
+>       assert con.execute("SELECT count(*) FROM pulse_alerts").fetchone()[0] == 0
+E       assert 1 == 0
+
+tests/test_review_pulse_delivery.py:57: AssertionError
+----------------------------- Captured stdout call -----------------------------
+🔥 RSS-пульс: темы набирают обороты
+
+• agent — ∞ к базовой линии, в 2 источниках
+=========================== short test summary info ============================
+FAILED tests/test_review_pulse_delivery.py::test_preview_twice_never_suppresses_delivery
+FAILED tests/test_review_pulse_delivery.py::test_delivery_error_does_not_start_cooldown
+FAILED tests/test_review_pulse_delivery.py::test_success_marks_only_after_send_and_second_run_is_silent
+3 failed, 1 passed in 0.31s

@@ -1,0 +1,38 @@
+FFFFF                                                                    [100%]
+=================================== FAILURES ===================================
+________ test_old_weekly_retry_also_delivers_current_week[False-False] _________
+tests/test_round2_followup.py:77: in test_old_weekly_retry_also_delivers_current_week
+    assert attempts == old + old + current * (2 if fail_current else 1)
+E   AssertionError: assert ['📰 RSS за не...ple.test/old'] == ['📰 RSS за не...ple.test/old']
+E     
+E     Right contains one more item: '📰 RSS за неделю\n⚠️ claude CLI не найден в PATH — дайджест собран без Claude.\n\nНовое за неделю:\n• current robot — https://example.test/current\n• old agent — https://example.test/old'
+E     Use -v to get more diff
+_________ test_old_weekly_retry_also_delivers_current_week[False-True] _________
+tests/test_round2_followup.py:77: in test_old_weekly_retry_also_delivers_current_week
+    assert attempts == old + old + current * (2 if fail_current else 1)
+E   AssertionError: assert ['📰 RSS за не...ple.test/old'] == ['📰 RSS за не...ple.test/old']
+E     
+E     Right contains one more item: '📰 RSS за неделю\n⚠️ claude CLI не найден в PATH — дайджест собран без Claude.\n\nНовое за неделю:\n• current robot — https://example.test/current\n• old agent — https://example.test/old'
+E     Use -v to get more diff
+_________ test_old_weekly_retry_also_delivers_current_week[True-False] _________
+tests/test_round2_followup.py:72: in test_old_weekly_retry_also_delivers_current_week
+    with pytest.raises(requests.RequestException):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE RequestException
+_________ test_old_weekly_retry_also_delivers_current_week[True-True] __________
+tests/test_round2_followup.py:72: in test_old_weekly_retry_also_delivers_current_week
+    with pytest.raises(requests.RequestException):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE RequestException
+_________ test_legacy_weekly_queue_migration_preserves_pending_payload _________
+tests/test_round2_followup.py:95: in test_legacy_weekly_queue_migration_preserves_pending_payload
+    assert row['created_at'] is None
+           ^^^^^^^^^^^^^^^^^
+E   IndexError: No item with that key
+=========================== short test summary info ============================
+FAILED tests/test_round2_followup.py::test_old_weekly_retry_also_delivers_current_week[False-False]
+FAILED tests/test_round2_followup.py::test_old_weekly_retry_also_delivers_current_week[False-True]
+FAILED tests/test_round2_followup.py::test_old_weekly_retry_also_delivers_current_week[True-False]
+FAILED tests/test_round2_followup.py::test_old_weekly_retry_also_delivers_current_week[True-True]
+FAILED tests/test_round2_followup.py::test_legacy_weekly_queue_migration_preserves_pending_payload
+5 failed, 3 deselected in 0.11s

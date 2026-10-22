@@ -59,13 +59,13 @@ def _parse(url, etag, modified):
     return parsed
 
 
-def fetch_feed(con, feed_url):
+def fetch_feed(con, feed_url, commit=True):
     etag, modified = common.get_feed_cache(con, feed_url)
     parsed = _parse(feed_url, etag, modified)
     status = getattr(parsed, "status", None)
     if status == 304:                      # не менялся
         common.set_feed_status(con, feed_url,
-                               etag=etag, modified=modified)
+                               etag=etag, modified=modified, commit=commit)
         return [], None
     if status is not None and status >= 400:
         # HTTP-ошибка: тело (даже если распарсилось) не считаем валидным фидом,
@@ -76,7 +76,7 @@ def fetch_feed(con, feed_url):
     records = entries_from_parsed(feed_url, parsed)
     common.set_feed_status(con, feed_url,
                            etag=getattr(parsed, "etag", None),
-                           modified=getattr(parsed, "modified", None))
+                           modified=getattr(parsed, "modified", None), commit=commit)
     return records, None
 
 
@@ -86,19 +86,28 @@ def run_fetch(cfg=None, con=None, limit=None):
     n_new, errors = 0, {}
     for feed_url in cfg["feeds"]:
         try:
-            records, err = fetch_feed(con, feed_url)
-        except Exception as exc:           # noqa: BLE001 — сеть/парсер
+            with con:
+                # Дата наступает независимо от HTTP-статуса, ротации фида
+                # и лимита новых записей. Повторный учёт идемпотентен.
+                deferred = con.execute(
+                    "SELECT * FROM entries WHERE feed_url=? "
+                    "AND substr(published, 1, 10) > substr(first_seen, 1, 10) "
+                    "AND substr(published, 1, 10) <= ?",
+                    (feed_url, common.day_of(common.now_utc())),
+                ).fetchall()
+                common.record_terms(con, [dict(r) for r in deferred], commit=False)
+            with con:
+                records, err = fetch_feed(con, feed_url, commit=False)
+                if err:
+                    raise ValueError(err)
+                if limit:
+                    records = records[:limit]
+                added = common.save_entries(con, records, commit=False)
+                common.record_terms(con, records, commit=False)
+            n_new += added
+        except Exception as exc:           # noqa: BLE001 — сеть/парсер/база
             errors[feed_url] = str(exc)
             common.set_feed_status(con, feed_url, error=str(exc))
-            continue
-        if err:
-            errors[feed_url] = err
-            common.set_feed_status(con, feed_url, error=err)
-            continue
-        if limit:
-            records = records[:limit]
-        n_new += common.save_entries(con, records)
-        common.record_terms(con, records)
     return n_new, errors
 
 

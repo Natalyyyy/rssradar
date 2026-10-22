@@ -1,0 +1,37 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___________________ test_main_collect_uses_only_stubbed_http ___________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10bedb6f0>
+capsys = <_pytest.capture.CaptureFixture object at 0x10bf46660>
+
+    def test_main_collect_uses_only_stubbed_http(monkeypatch, capsys):
+        """Запуск отчёта должен использовать подготовленную внешнюю границу."""
+        monkeypatch.setattr(sys, "argv", ["report.py", "weekly"])
+        report.main()
+>       assert "Тест попытался выйти в сеть" not in capsys.readouterr().err
+E       AssertionError: assert 'Тест попыта...выйти в сеть' not in '⚠️ scrape:a...йти в сеть\n'
+E         
+E         'Тест попытался выйти в сеть' is contained here:
+E           ⚠️ scrape:anthropic/news: Тест попытался выйти в сеть
+E           ⚠️ scrape:anthropic/engineering: Тест попытался выйти в сеть
+E           ⚠️ scrape:anthropic/research: Тест попытался выйти в сеть
+
+tests/test_review_isolation.py:10: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_review_isolation.py::test_main_collect_uses_only_stubbed_http
+1 failed in 0.04s
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_____________________ test_unstubbed_subprocess_is_blocked _____________________
+
+    def test_unstubbed_subprocess_is_blocked():
+        import subprocess
+>       with pytest.raises(RuntimeError, match="внешний процесс"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE RuntimeError
+
+tests/test_review_isolation.py:18: Failed
+=========================== short test summary info ============================
+FAILED tests/test_review_isolation.py::test_unstubbed_subprocess_is_blocked
+1 failed, 1 deselected in 0.06s

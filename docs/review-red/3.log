@@ -1,0 +1,249 @@
+.F.F.F.F.F.                                                              [100%]
+=================================== FAILURES ===================================
+________________ test_model_invocation_is_isolated[ok-clusters] ________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109cffbb0>
+tmp_path = PosixPath('tmp/test')
+kind = 'clusters', outcome = 'ok'
+
+    @pytest.mark.parametrize("kind", ["summary", "clusters"])
+    @pytest.mark.parametrize("outcome", ["ok", "empty", "exit", "timeout", "oserror"])
+    def test_model_invocation_is_isolated(monkeypatch, tmp_path, kind, outcome):
+        monkeypatch.setattr(report.shutil, "which", lambda name: "/test/claude")
+        monkeypatch.setenv("TELEGRAM_TOKEN", "secret")
+        prompt = tmp_path / "prompt.md"
+        prompt.write_text("instructions")
+        calls = []
+        def run(cmd, **kw):
+            calls.append(cmd)
+            assert cmd[cmd.index("--tools") + 1] == ""
+            assert cmd[cmd.index("--model") + 1] == "claude-opus-5"
+            assert "TELEGRAM_TOKEN" not in kw["env"]
+            assert "untrusted title" in kw["input"]
+            if outcome == "timeout":
+                raise subprocess.TimeoutExpired(cmd, 300)
+            if outcome == "oserror":
+                raise OSError("unavailable")
+            return SimpleNamespace(returncode=1 if outcome == "exit" else 0,
+                                   stdout='' if outcome == "empty" else '[{"theme":"X","items":[]}]')
+        monkeypatch.setattr(report.subprocess, "run", run)
+        fn = getattr(report, "claude_" + kind)
+        for _ in range(2):
+>           result = fn([{"title": "untrusted title", "link": "https://x"}], prompt)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_review_model.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+report.py:235: in claude_clusters
+    result = subprocess.run(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+cmd = ['/test/claude', '-p', '--output-format', 'text']
+kw = {'input': 'instructions\n\n- untrusted title — https://x', 'capture_output': True, 'text': True, 'timeout': 300}
+
+    def run(cmd, **kw):
+        calls.append(cmd)
+>       assert cmd[cmd.index("--tools") + 1] == ""
+                   ^^^^^^^^^^^^^^^^^^^^
+E       ValueError: list.index(x): x not in list
+
+tests/test_review_model.py:17: ValueError
+______________ test_model_invocation_is_isolated[empty-clusters] _______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109d76030>
+tmp_path = PosixPath('tmp/test')
+kind = 'clusters', outcome = 'empty'
+
+    @pytest.mark.parametrize("kind", ["summary", "clusters"])
+    @pytest.mark.parametrize("outcome", ["ok", "empty", "exit", "timeout", "oserror"])
+    def test_model_invocation_is_isolated(monkeypatch, tmp_path, kind, outcome):
+        monkeypatch.setattr(report.shutil, "which", lambda name: "/test/claude")
+        monkeypatch.setenv("TELEGRAM_TOKEN", "secret")
+        prompt = tmp_path / "prompt.md"
+        prompt.write_text("instructions")
+        calls = []
+        def run(cmd, **kw):
+            calls.append(cmd)
+            assert cmd[cmd.index("--tools") + 1] == ""
+            assert cmd[cmd.index("--model") + 1] == "claude-opus-5"
+            assert "TELEGRAM_TOKEN" not in kw["env"]
+            assert "untrusted title" in kw["input"]
+            if outcome == "timeout":
+                raise subprocess.TimeoutExpired(cmd, 300)
+            if outcome == "oserror":
+                raise OSError("unavailable")
+            return SimpleNamespace(returncode=1 if outcome == "exit" else 0,
+                                   stdout='' if outcome == "empty" else '[{"theme":"X","items":[]}]')
+        monkeypatch.setattr(report.subprocess, "run", run)
+        fn = getattr(report, "claude_" + kind)
+        for _ in range(2):
+>           result = fn([{"title": "untrusted title", "link": "https://x"}], prompt)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_review_model.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+report.py:235: in claude_clusters
+    result = subprocess.run(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+cmd = ['/test/claude', '-p', '--output-format', 'text']
+kw = {'input': 'instructions\n\n- untrusted title — https://x', 'capture_output': True, 'text': True, 'timeout': 300}
+
+    def run(cmd, **kw):
+        calls.append(cmd)
+>       assert cmd[cmd.index("--tools") + 1] == ""
+                   ^^^^^^^^^^^^^^^^^^^^
+E       ValueError: list.index(x): x not in list
+
+tests/test_review_model.py:17: ValueError
+_______________ test_model_invocation_is_isolated[exit-clusters] _______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109e94650>
+tmp_path = PosixPath('tmp/test')
+kind = 'clusters', outcome = 'exit'
+
+    @pytest.mark.parametrize("kind", ["summary", "clusters"])
+    @pytest.mark.parametrize("outcome", ["ok", "empty", "exit", "timeout", "oserror"])
+    def test_model_invocation_is_isolated(monkeypatch, tmp_path, kind, outcome):
+        monkeypatch.setattr(report.shutil, "which", lambda name: "/test/claude")
+        monkeypatch.setenv("TELEGRAM_TOKEN", "secret")
+        prompt = tmp_path / "prompt.md"
+        prompt.write_text("instructions")
+        calls = []
+        def run(cmd, **kw):
+            calls.append(cmd)
+            assert cmd[cmd.index("--tools") + 1] == ""
+            assert cmd[cmd.index("--model") + 1] == "claude-opus-5"
+            assert "TELEGRAM_TOKEN" not in kw["env"]
+            assert "untrusted title" in kw["input"]
+            if outcome == "timeout":
+                raise subprocess.TimeoutExpired(cmd, 300)
+            if outcome == "oserror":
+                raise OSError("unavailable")
+            return SimpleNamespace(returncode=1 if outcome == "exit" else 0,
+                                   stdout='' if outcome == "empty" else '[{"theme":"X","items":[]}]')
+        monkeypatch.setattr(report.subprocess, "run", run)
+        fn = getattr(report, "claude_" + kind)
+        for _ in range(2):
+>           result = fn([{"title": "untrusted title", "link": "https://x"}], prompt)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_review_model.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+report.py:235: in claude_clusters
+    result = subprocess.run(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+cmd = ['/test/claude', '-p', '--output-format', 'text']
+kw = {'input': 'instructions\n\n- untrusted title — https://x', 'capture_output': True, 'text': True, 'timeout': 300}
+
+    def run(cmd, **kw):
+        calls.append(cmd)
+>       assert cmd[cmd.index("--tools") + 1] == ""
+                   ^^^^^^^^^^^^^^^^^^^^
+E       ValueError: list.index(x): x not in list
+
+tests/test_review_model.py:17: ValueError
+_____________ test_model_invocation_is_isolated[timeout-clusters] ______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109d97c50>
+tmp_path = PosixPath('tmp/test')
+kind = 'clusters', outcome = 'timeout'
+
+    @pytest.mark.parametrize("kind", ["summary", "clusters"])
+    @pytest.mark.parametrize("outcome", ["ok", "empty", "exit", "timeout", "oserror"])
+    def test_model_invocation_is_isolated(monkeypatch, tmp_path, kind, outcome):
+        monkeypatch.setattr(report.shutil, "which", lambda name: "/test/claude")
+        monkeypatch.setenv("TELEGRAM_TOKEN", "secret")
+        prompt = tmp_path / "prompt.md"
+        prompt.write_text("instructions")
+        calls = []
+        def run(cmd, **kw):
+            calls.append(cmd)
+            assert cmd[cmd.index("--tools") + 1] == ""
+            assert cmd[cmd.index("--model") + 1] == "claude-opus-5"
+            assert "TELEGRAM_TOKEN" not in kw["env"]
+            assert "untrusted title" in kw["input"]
+            if outcome == "timeout":
+                raise subprocess.TimeoutExpired(cmd, 300)
+            if outcome == "oserror":
+                raise OSError("unavailable")
+            return SimpleNamespace(returncode=1 if outcome == "exit" else 0,
+                                   stdout='' if outcome == "empty" else '[{"theme":"X","items":[]}]')
+        monkeypatch.setattr(report.subprocess, "run", run)
+        fn = getattr(report, "claude_" + kind)
+        for _ in range(2):
+>           result = fn([{"title": "untrusted title", "link": "https://x"}], prompt)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_review_model.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+report.py:235: in claude_clusters
+    result = subprocess.run(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+cmd = ['/test/claude', '-p', '--output-format', 'text']
+kw = {'input': 'instructions\n\n- untrusted title — https://x', 'capture_output': True, 'text': True, 'timeout': 300}
+
+    def run(cmd, **kw):
+        calls.append(cmd)
+>       assert cmd[cmd.index("--tools") + 1] == ""
+                   ^^^^^^^^^^^^^^^^^^^^
+E       ValueError: list.index(x): x not in list
+
+tests/test_review_model.py:17: ValueError
+_____________ test_model_invocation_is_isolated[oserror-clusters] ______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109e10ad0>
+tmp_path = PosixPath('tmp/test')
+kind = 'clusters', outcome = 'oserror'
+
+    @pytest.mark.parametrize("kind", ["summary", "clusters"])
+    @pytest.mark.parametrize("outcome", ["ok", "empty", "exit", "timeout", "oserror"])
+    def test_model_invocation_is_isolated(monkeypatch, tmp_path, kind, outcome):
+        monkeypatch.setattr(report.shutil, "which", lambda name: "/test/claude")
+        monkeypatch.setenv("TELEGRAM_TOKEN", "secret")
+        prompt = tmp_path / "prompt.md"
+        prompt.write_text("instructions")
+        calls = []
+        def run(cmd, **kw):
+            calls.append(cmd)
+            assert cmd[cmd.index("--tools") + 1] == ""
+            assert cmd[cmd.index("--model") + 1] == "claude-opus-5"
+            assert "TELEGRAM_TOKEN" not in kw["env"]
+            assert "untrusted title" in kw["input"]
+            if outcome == "timeout":
+                raise subprocess.TimeoutExpired(cmd, 300)
+            if outcome == "oserror":
+                raise OSError("unavailable")
+            return SimpleNamespace(returncode=1 if outcome == "exit" else 0,
+                                   stdout='' if outcome == "empty" else '[{"theme":"X","items":[]}]')
+        monkeypatch.setattr(report.subprocess, "run", run)
+        fn = getattr(report, "claude_" + kind)
+        for _ in range(2):
+>           result = fn([{"title": "untrusted title", "link": "https://x"}], prompt)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_review_model.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+report.py:235: in claude_clusters
+    result = subprocess.run(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+cmd = ['/test/claude', '-p', '--output-format', 'text']
+kw = {'input': 'instructions\n\n- untrusted title — https://x', 'capture_output': True, 'text': True, 'timeout': 300}
+
+    def run(cmd, **kw):
+        calls.append(cmd)
+>       assert cmd[cmd.index("--tools") + 1] == ""
+                   ^^^^^^^^^^^^^^^^^^^^
+E       ValueError: list.index(x): x not in list
+
+tests/test_review_model.py:17: ValueError
+=========================== short test summary info ============================
+FAILED tests/test_review_model.py::test_model_invocation_is_isolated[ok-clusters]
+FAILED tests/test_review_model.py::test_model_invocation_is_isolated[empty-clusters]
+FAILED tests/test_review_model.py::test_model_invocation_is_isolated[exit-clusters]
+FAILED tests/test_review_model.py::test_model_invocation_is_isolated[timeout-clusters]
+FAILED tests/test_review_model.py::test_model_invocation_is_isolated[oserror-clusters]
+5 failed, 6 passed in 0.07s

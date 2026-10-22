@@ -1,0 +1,12 @@
+F.                                                                       [100%]
+=================================== FAILURES ===================================
+_____________ test_due_terms_survive_feed_rotation_and_limit[200] ______________
+tests/test_round2.py:39: in test_due_terms_survive_feed_rotation_and_limit
+    assert [tuple(r) for r in con.execute("SELECT * FROM term_counts WHERE term='agent'")] == [
+E   AssertionError: assert [] == [('agent', '2...-22', 'feed')]
+E     
+E     Right contains one more item: ('agent', '2026-10-22', 'feed')
+E     Use -v to get more diff
+=========================== short test summary info ============================
+FAILED tests/test_round2.py::test_due_terms_survive_feed_rotation_and_limit[200]
+1 failed, 1 passed, 3 deselected in 0.19s

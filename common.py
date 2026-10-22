@@ -45,6 +45,27 @@ CREATE TABLE IF NOT EXISTS term_counts (
     feed_url TEXT NOT NULL,
     PRIMARY KEY (term, day, feed_url)
 );
+CREATE TABLE IF NOT EXISTS pulse_queue (
+    id         INTEGER PRIMARY KEY CHECK (id = 1),
+    text       TEXT NOT NULL,
+    terms      TEXT NOT NULL,
+    chat_id    TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS pulse_delivery (
+    id         INTEGER PRIMARY KEY CHECK (id = 1),
+    chunks     TEXT NOT NULL,
+    next_part  INTEGER NOT NULL DEFAULT 0,
+    retry_at   TEXT
+);
+CREATE TABLE IF NOT EXISTS weekly_delivery (
+    created_at TEXT,
+    id         INTEGER PRIMARY KEY CHECK (id = 1),
+    text       TEXT NOT NULL,
+    chat_id    TEXT NOT NULL,
+    chunks     TEXT NOT NULL,
+    next_part  INTEGER NOT NULL DEFAULT 0,
+    retry_at   TEXT
+);
 CREATE TABLE IF NOT EXISTS pulse_alerts (
     term       TEXT PRIMARY KEY,
     alerted_at TEXT NOT NULL
@@ -113,10 +134,14 @@ def connect(db_path=None):
     con.row_factory = sqlite3.Row
     if SCHEMA.strip():
         con.executescript(SCHEMA)
+        columns = {row["name"] for row in con.execute("PRAGMA table_info(weekly_delivery)")}
+        if columns and "created_at" not in columns:
+            con.execute("ALTER TABLE weekly_delivery ADD COLUMN created_at TEXT")
+            con.commit()
     return con
 
 
-def save_entries(con, records):
+def save_entries(con, records, commit=True):
     new = 0
     stamp = now_utc().isoformat()
     for r in records:
@@ -128,11 +153,12 @@ def save_entries(con, records):
              r.get("published", ""), r.get("summary", ""), stamp),
         )
         new += cur.rowcount
-    con.commit()
+    if commit:
+        con.commit()
     return new
 
 
-def record_terms(con, records):
+def record_terms(con, records, commit=True):
     for r in records:
         published = r.get("published") or ""
         day = None
@@ -153,12 +179,15 @@ def record_terms(con, records):
                     day = None
         if day is None:
             day = day_of(now_utc())
+        if day > day_of(now_utc()):
+            continue
         for term in set(normalize_terms(r.get("title", ""))):
             con.execute(
                 "INSERT OR IGNORE INTO term_counts (term, day, feed_url) VALUES (?,?,?)",
                 (term, day, r["feed_url"]),
             )
-    con.commit()
+    if commit:
+        con.commit()
 
 
 def get_feed_cache(con, feed_url):
@@ -168,7 +197,7 @@ def get_feed_cache(con, feed_url):
     return (row["etag"], row["modified"]) if row else (None, None)
 
 
-def set_feed_status(con, feed_url, etag=None, modified=None, error=None):
+def set_feed_status(con, feed_url, etag=None, modified=None, error=None, commit=True):
     stamp = now_utc().isoformat()
     if error is None:
         con.execute(
@@ -184,7 +213,8 @@ def set_feed_status(con, feed_url, etag=None, modified=None, error=None):
             "ON CONFLICT(feed_url) DO UPDATE SET last_error=excluded.last_error",
             (feed_url, error),
         )
-    con.commit()
+    if commit:
+        con.commit()
 
 
 def failed_feeds(con):
@@ -197,7 +227,8 @@ def failed_feeds(con):
 
 
 def data_span_days(con, now=None):
-    row = con.execute("SELECT MIN(day) AS lo, MAX(day) AS hi FROM term_counts").fetchone()
+    row = con.execute("SELECT MIN(day) AS lo, MAX(day) AS hi FROM term_counts WHERE day <= ?",
+                      (day_of(now or now_utc()),)).fetchone()
     if not row or not row["lo"]:
         return 0
     lo = parse_ts(row["lo"] + "T00:00:00Z")
@@ -214,14 +245,15 @@ def was_alerted_recently(con, term, now, cooldown_days):
     return parse_ts(row["alerted_at"]) >= now - timedelta(days=cooldown_days)
 
 
-def mark_alerted(con, terms, at=None):
+def mark_alerted(con, terms, at=None, commit=True):
     stamp = (at or now_utc()).isoformat()
     con.executemany(
         "INSERT INTO pulse_alerts (term, alerted_at) VALUES (?,?) "
         "ON CONFLICT(term) DO UPDATE SET alerted_at=excluded.alerted_at",
         [(t, stamp) for t in terms],
     )
-    con.commit()
+    if commit:
+        con.commit()
 
 
 import re

@@ -1,0 +1,63 @@
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+____________ test_pulse_reports_stored_feed_failure_without_signals ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10744be10>
+capsys = <_pytest.capture.CaptureFixture object at 0x1074ae3c0>
+
+    def test_pulse_reports_stored_feed_failure_without_signals(monkeypatch, capsys):
+        con = common.connect()
+        common.set_feed_status(con, "broken-feed", error="HTTP 500")
+        con.close()
+        monkeypatch.setattr(sys, "argv", ["report.py", "pulse", "--no-fetch"])
+        report.main()
+>       assert "broken-feed" in capsys.readouterr().out
+E       AssertionError: assert 'broken-feed' in 'Тихо: всплесков нет.\n'
+E        +  where 'Тихо: всплесков нет.\n' = CaptureResult(out='Тихо: всплесков нет.\n', err='').out
+E        +    where CaptureResult(out='Тихо: всплесков нет.\n', err='') = readouterr()
+E        +      where readouterr = <_pytest.capture.CaptureFixture object at 0x1074ae3c0>.readouterr
+
+tests/test_review_collection.py:14: AssertionError
+_______________ test_collection_exception_is_not_a_quiet_success _______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10744bbb0>
+capsys = <_pytest.capture.CaptureFixture object at 0x1074b9bd0>
+
+    def test_collection_exception_is_not_a_quiet_success(monkeypatch, capsys):
+        common.CONFIG_PATH.write_text('{"feeds": 42}')
+        monkeypatch.setattr(sys, "argv", ["report.py", "pulse"])
+>       with pytest.raises(SystemExit) as exc:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE SystemExit
+
+tests/test_review_collection.py:20: Failed
+----------------------------- Captured stdout call -----------------------------
+Тихо: всплесков нет.
+----------------------------- Captured stderr call -----------------------------
+⚠️ rssradar: не удалось собрать фиды (сеть или битый фид). Проверь список в config.json. ('int' object is not iterable)
+_________ test_network_failures_have_nonzero_exit_even_without_signals _________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1075b5eb0>
+capsys = <_pytest.capture.CaptureFixture object at 0x107630f50>
+
+    def test_network_failures_have_nonzero_exit_even_without_signals(monkeypatch, capsys):
+        def fail(*a, **k):
+            raise requests.Timeout("timeout")
+        monkeypatch.setattr(requests, "get", fail)
+        monkeypatch.setattr(sys, "argv", ["report.py", "pulse"])
+>       with pytest.raises(SystemExit) as exc:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE SystemExit
+
+tests/test_review_collection.py:33: Failed
+----------------------------- Captured stdout call -----------------------------
+Тихо: всплесков нет.
+----------------------------- Captured stderr call -----------------------------
+⚠️ scrape:anthropic/news: timeout
+⚠️ scrape:anthropic/engineering: timeout
+⚠️ scrape:anthropic/research: timeout
+=========================== short test summary info ============================
+FAILED tests/test_review_collection.py::test_pulse_reports_stored_feed_failure_without_signals
+FAILED tests/test_review_collection.py::test_collection_exception_is_not_a_quiet_success
+FAILED tests/test_review_collection.py::test_network_failures_have_nonzero_exit_even_without_signals
+3 failed in 0.15s

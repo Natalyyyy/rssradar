@@ -12,6 +12,7 @@ import argparse
 import html as html_mod
 import re
 import sys
+from html.parser import HTMLParser
 from datetime import datetime, timezone
 
 import requests
@@ -28,7 +29,6 @@ SITES = [
     ("scrape:anthropic/research",    "https://www.anthropic.com/research",    "research"),
 ]
 
-WINDOW = 2000          # сколько символов после ссылки просматриваем в поисках заголовка/даты
 # заголовок карточки — либо <h1>..<h6>, либо <span class="...__title ...">
 TITLE_RE = re.compile(
     r"<h[1-6][^>]*>(.*?)</h[1-6]>|<span[^>]*__title[^>]*>(.*?)</span>", re.DOTALL)
@@ -47,14 +47,45 @@ def _iso(date_str: str) -> str:
         return ""
 
 
+class _Cards(HTMLParser):
+    """Содержимое каждой ссылки отдельно: соседние карточки не смешиваются."""
+    def __init__(self):
+        super().__init__()
+        self.cards = []
+        self.href = None
+        self.parts = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "a":
+            self.href = dict(attrs).get("href")
+            self.parts = []
+        elif self.href is not None:
+            self.parts.append(self.get_starttag_text())
+
+    def handle_data(self, data):
+        if self.href is not None:
+            self.parts.append(html_mod.escape(data))
+
+    def handle_endtag(self, tag):
+        if tag == "a":
+            if self.href is not None:
+                self.cards.append((self.href, "".join(self.parts)))
+            self.href = None
+            self.parts = []
+        elif self.href is not None:
+            self.parts.append("</%s>" % tag)
+
+
 def parse_index(html: str, section: str, base="https://www.anthropic.com") -> list[dict]:
-    """Карточки со страницы-индекса: ссылка + ближайшие за ней заголовок и дата."""
+    """Карточки со страницы-индекса: заголовок и дата внутри ссылки."""
     out, seen = [], set()
-    for m in re.finditer(r'href="(/%s/[a-z0-9\-]+)"' % section, html):
-        slug = m.group(1)
+    parser = _Cards()
+    parser.feed(html)
+    for slug, tail in parser.cards:
+        if not re.fullmatch(r"/%s/[a-z0-9\-]+" % re.escape(section), slug):
+            continue
         if slug in seen:
             continue
-        tail = html[m.end():m.end() + WINDOW]
         tm = TITLE_RE.search(tail)
         if not tm:
             continue
@@ -80,6 +111,13 @@ def run_scrape(con=None, limit=None):
     n_new, errors = 0, {}
     for feed_url, url, section in SITES:
         try:
+            # Дата сохранённой статьи наступает независимо от доступности
+            # индекса, ротации карточек и лимита новых записей.
+            with con:
+                saved = con.execute(
+                    "SELECT * FROM entries WHERE feed_url=?", (feed_url,)
+                ).fetchall()
+                common.record_terms(con, [dict(row) for row in saved], commit=False)
             resp = requests.get(url, timeout=TIMEOUT, headers=UA)
             resp.raise_for_status()
             records = parse_index(resp.text, section)
@@ -93,9 +131,15 @@ def run_scrape(con=None, limit=None):
             continue
         if limit:
             records = records[:limit]
-        n_new += common.save_entries(con, records)
-        common.record_terms(con, records)
-        common.set_feed_status(con, feed_url)
+        try:
+            with con:
+                added = common.save_entries(con, records, commit=False)
+                common.record_terms(con, records, commit=False)
+                common.set_feed_status(con, feed_url, commit=False)
+            n_new += added
+        except Exception as exc:                       # noqa: BLE001 — база
+            errors[feed_url] = str(exc)
+            common.set_feed_status(con, feed_url, error=str(exc))
     return n_new, errors
 
 

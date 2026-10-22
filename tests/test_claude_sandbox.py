@@ -15,6 +15,7 @@ import report
 
 def _перехват(monkeypatch, модуль):
     захват = {}
+    monkeypatch.setattr(модуль.shutil, "which", lambda name: "/test/claude")
 
     def подделка(cmd, **kw):
         захват["cmd"] = list(cmd)

@@ -1,0 +1,29 @@
+venv/bin/python -m pytest tests/test_second_review.py -k scraper -q --tb=short --show-capture=no
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+___________ test_scraper_restores_due_article_without_card[rotated] ____________
+tests/test_second_review.py:35: in test_scraper_restores_due_article_without_card
+    assert [tuple(r) for r in con.execute("SELECT * FROM term_counts WHERE term='agent'")] == [
+E   AssertionError: assert [] == [('agent', '2...hropic/news')]
+E     
+E     Right contains one more item: ('agent', '2026-10-22', 'scrape:anthropic/news')
+E     Use -v to get more diff
+____________ test_scraper_restores_due_article_without_card[empty] _____________
+tests/test_second_review.py:35: in test_scraper_restores_due_article_without_card
+    assert [tuple(r) for r in con.execute("SELECT * FROM term_counts WHERE term='agent'")] == [
+E   AssertionError: assert [] == [('agent', '2...hropic/news')]
+E     
+E     Right contains one more item: ('agent', '2026-10-22', 'scrape:anthropic/news')
+E     Use -v to get more diff
+___________ test_scraper_restores_due_article_without_card[offline] ____________
+tests/test_second_review.py:35: in test_scraper_restores_due_article_without_card
+    assert [tuple(r) for r in con.execute("SELECT * FROM term_counts WHERE term='agent'")] == [
+E   AssertionError: assert [] == [('agent', '2...hropic/news')]
+E     
+E     Right contains one more item: ('agent', '2026-10-22', 'scrape:anthropic/news')
+E     Use -v to get more diff
+=========================== short test summary info ============================
+FAILED tests/test_second_review.py::test_scraper_restores_due_article_without_card[rotated]
+FAILED tests/test_second_review.py::test_scraper_restores_due_article_without_card[empty]
+FAILED tests/test_second_review.py::test_scraper_restores_due_article_without_card[offline]
+3 failed, 4 deselected in 0.20s

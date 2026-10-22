@@ -1,0 +1,28 @@
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+________ test_due_rss_terms_are_counted_even_when_fetch_fails[http500] _________
+tests/test_round2_followup.py:36: in test_due_rss_terms_are_counted_even_when_fetch_fails
+    assert [tuple(row) for row in con.execute('SELECT * FROM term_counts')] == [
+E   AssertionError: assert [] == [('agent', '2...-22', 'feed')]
+E     
+E     Right contains one more item: ('agent', '2026-10-22', 'feed')
+E     Use -v to get more diff
+________ test_due_rss_terms_are_counted_even_when_fetch_fails[timeout] _________
+tests/test_round2_followup.py:36: in test_due_rss_terms_are_counted_even_when_fetch_fails
+    assert [tuple(row) for row in con.execute('SELECT * FROM term_counts')] == [
+E   AssertionError: assert [] == [('agent', '2...-22', 'feed')]
+E     
+E     Right contains one more item: ('agent', '2026-10-22', 'feed')
+E     Use -v to get more diff
+_______ test_due_rss_terms_are_counted_even_when_fetch_fails[malformed] ________
+tests/test_round2_followup.py:36: in test_due_rss_terms_are_counted_even_when_fetch_fails
+    assert [tuple(row) for row in con.execute('SELECT * FROM term_counts')] == [
+E   AssertionError: assert [] == [('agent', '2...-22', 'feed')]
+E     
+E     Right contains one more item: ('agent', '2026-10-22', 'feed')
+E     Use -v to get more diff
+=========================== short test summary info ============================
+FAILED tests/test_round2_followup.py::test_due_rss_terms_are_counted_even_when_fetch_fails[http500]
+FAILED tests/test_round2_followup.py::test_due_rss_terms_are_counted_even_when_fetch_fails[timeout]
+FAILED tests/test_round2_followup.py::test_due_rss_terms_are_counted_even_when_fetch_fails[malformed]
+3 failed, 5 deselected in 0.07s

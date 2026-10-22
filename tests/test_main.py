@@ -1,47 +1,52 @@
 import sys
+from datetime import timedelta
+import pytest
+import requests
 import common
-import fetch
 import report
+
+pytestmark = pytest.mark.usefixtures("report_http")
 
 
 def test_main_surfaces_fetch_errors(monkeypatch, capsys):
-    monkeypatch.setattr(fetch, "collect",
-                        lambda cfg, con: (0, {"http://x/feed": "boom"}))
-    real_connect = common.connect
-    monkeypatch.setattr(common, "connect", lambda: real_connect(":memory:"))
+    common.CONFIG_PATH.write_text('{"feeds": ["http://x/feed"]}')
+    def fail(*args, **kwargs):
+        raise requests.Timeout("boom")
+    monkeypatch.setattr(requests, "get", fail)
     monkeypatch.setattr(sys, "argv", ["report.py", "weekly"])
-    report.main()
+    with pytest.raises(SystemExit) as exc:
+        report.main()
+    assert exc.value.code == 1
     err = capsys.readouterr().err
     assert "http://x/feed" in err and "boom" in err
 
 
 def test_main_weekly_prints_failed_feeds_footer(monkeypatch, capsys):
-    real_connect = common.connect
-    con = real_connect(":memory:")
+    con = common.connect()
     common.set_feed_status(con, "https://broken/feed", error="HTTP 404")
-    monkeypatch.setattr(common, "connect", lambda: con)
-    monkeypatch.setattr(fetch, "run_fetch", lambda cfg, con: (0, {}))
-    monkeypatch.setattr(report, "build_weekly", lambda con, cfg: "📰 RSS за неделю\n\nПусто.")
-    monkeypatch.setattr(sys, "argv", ["report.py", "weekly"])
+    con.close()
+    monkeypatch.setattr(sys, "argv", ["report.py", "weekly", "--no-fetch"])
     report.main()
     out = capsys.readouterr().out
     assert "⚠️" in out and "https://broken/feed" in out
 
 
 def test_main_pulse_marks_alerted(monkeypatch, capsys):
-    real_connect = common.connect
-    monkeypatch.setattr(common, "connect", lambda: real_connect(":memory:"))
-    monkeypatch.setattr(fetch, "run_fetch", lambda cfg, con: (0, {}))
-    monkeypatch.setattr(report, "pulse_signals",
-                        lambda con, cfg, now=None: [
-                            {"term": "агент", "recent_feeds": 3, "recent_daily": 2.5,
-                             "baseline_daily": 1.0, "ratio": 2.5,
-                             "links": [("Заголовок", "https://x/1")]}])
-    marked = {}
-    monkeypatch.setattr(common, "mark_alerted",
-                        lambda con, terms, at=None: marked.setdefault("terms", terms))
-    monkeypatch.setattr(sys, "argv", ["report.py", "pulse"])
+    con = common.connect()
+    now = common.now_utc()
+    con.execute("INSERT INTO term_counts VALUES ('история', ?, 'old')",
+                (common.day_of(now - timedelta(days=20)),))
+    for feed in ("f1", "f2", "f3"):
+        con.execute("INSERT INTO term_counts VALUES ('агент', ?, ?)",
+                    (common.day_of(now), feed))
+    con.commit()
+    common.ENV_PATH.write_text("TELEGRAM_TOKEN=test\nTELEGRAM_CHAT_ID=123\n")
+    class Response:
+        def raise_for_status(self):
+            pass
+    monkeypatch.setattr(requests, "post", lambda *a, **k: Response())
+    monkeypatch.setattr(sys, "argv", ["report.py", "pulse", "--send", "--no-fetch"])
     report.main()
     out = capsys.readouterr().out
     assert "агент" in out
-    assert marked.get("terms") == ["агент"]
+    assert [r[0] for r in con.execute("SELECT term FROM pulse_alerts")] == ["агент"]

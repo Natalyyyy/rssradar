@@ -1,0 +1,69 @@
+FFF.                                                                     [100%]
+=================================== FAILURES ===================================
+___________ test_send_requires_both_credentials_before_collection[] ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10bfa3ce0>
+settings = '', capsys = <_pytest.capture.CaptureFixture object at 0x10c005d30>
+
+    @pytest.mark.parametrize("settings", ["", "TELEGRAM_TOKEN=test\n", "TELEGRAM_CHAT_ID=123\n"])
+    def test_send_requires_both_credentials_before_collection(monkeypatch, settings, capsys):
+        common.ENV_PATH.write_text(settings)
+        monkeypatch.setattr(sys, "argv", ["report.py", "pulse", "--send"])
+>       with pytest.raises(SystemExit) as exc:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE SystemExit
+
+tests/test_review_send_config.py:11: Failed
+----------------------------- Captured stdout call -----------------------------
+Тихо: всплесков нет.
+----------------------------- Captured stderr call -----------------------------
+⚠️ scrape:anthropic/news: Тест попытался выйти в сеть
+⚠️ scrape:anthropic/engineering: Тест попытался выйти в сеть
+⚠️ scrape:anthropic/research: Тест попытался выйти в сеть
+_ test_send_requires_both_credentials_before_collection[TELEGRAM_TOKEN=test\n] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10bfa3a80>
+settings = 'TELEGRAM_TOKEN=test\n'
+capsys = <_pytest.capture.CaptureFixture object at 0x10c179810>
+
+    @pytest.mark.parametrize("settings", ["", "TELEGRAM_TOKEN=test\n", "TELEGRAM_CHAT_ID=123\n"])
+    def test_send_requires_both_credentials_before_collection(monkeypatch, settings, capsys):
+        common.ENV_PATH.write_text(settings)
+        monkeypatch.setattr(sys, "argv", ["report.py", "pulse", "--send"])
+>       with pytest.raises(SystemExit) as exc:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE SystemExit
+
+tests/test_review_send_config.py:11: Failed
+----------------------------- Captured stdout call -----------------------------
+Тихо: всплесков нет.
+----------------------------- Captured stderr call -----------------------------
+⚠️ scrape:anthropic/news: Тест попытался выйти в сеть
+⚠️ scrape:anthropic/engineering: Тест попытался выйти в сеть
+⚠️ scrape:anthropic/research: Тест попытался выйти в сеть
+_ test_send_requires_both_credentials_before_collection[TELEGRAM_CHAT_ID=123\n] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10c0fe8d0>
+settings = 'TELEGRAM_CHAT_ID=123\n'
+capsys = <_pytest.capture.CaptureFixture object at 0x10c179a90>
+
+    @pytest.mark.parametrize("settings", ["", "TELEGRAM_TOKEN=test\n", "TELEGRAM_CHAT_ID=123\n"])
+    def test_send_requires_both_credentials_before_collection(monkeypatch, settings, capsys):
+        common.ENV_PATH.write_text(settings)
+        monkeypatch.setattr(sys, "argv", ["report.py", "pulse", "--send"])
+>       with pytest.raises(SystemExit) as exc:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE SystemExit
+
+tests/test_review_send_config.py:11: Failed
+----------------------------- Captured stdout call -----------------------------
+Тихо: всплесков нет.
+----------------------------- Captured stderr call -----------------------------
+⚠️ scrape:anthropic/news: Тест попытался выйти в сеть
+⚠️ scrape:anthropic/engineering: Тест попытался выйти в сеть
+⚠️ scrape:anthropic/research: Тест попытался выйти в сеть
+=========================== short test summary info ============================
+FAILED tests/test_review_send_config.py::test_send_requires_both_credentials_before_collection[]
+FAILED tests/test_review_send_config.py::test_send_requires_both_credentials_before_collection[TELEGRAM_TOKEN=test\n]
+FAILED tests/test_review_send_config.py::test_send_requires_both_credentials_before_collection[TELEGRAM_CHAT_ID=123\n]
+3 failed, 1 passed in 0.10s

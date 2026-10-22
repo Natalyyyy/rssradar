@@ -1,0 +1,148 @@
+...FFF                                                                   [100%]
+=================================== FAILURES ===================================
+_____________ test_pending_pulse_checks_current_window[True-None] ______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10c534050>
+failure = None, has_current = True
+
+    @pytest.mark.parametrize("failure", [None, "old", "current"])
+    @pytest.mark.parametrize("has_current", [False, True])
+    def test_pending_pulse_checks_current_window(monkeypatch, failure, has_current):
+        original_failure = failure
+        Clock.instant = datetime(2026, 10, 21, tzinfo=timezone.utc)
+        monkeypatch.setattr(common, "datetime", Clock)
+        con = common.connect()
+        cfg = dict(common.DEFAULTS, pulse_window_days=1)
+        env = {"TELEGRAM_TOKEN": "test", "TELEGRAM_CHAT_ID": "123"}
+        con.execute("INSERT INTO term_counts VALUES ('history', '2026-09-01', 'f1')")
+        for feed in ("f1", "f2"):
+            con.execute("INSERT INTO term_counts VALUES ('old', '2026-10-20', ?)", (feed,))
+            if has_current:
+                con.execute("INSERT INTO term_counts VALUES ('current', '2026-10-21', ?)", (feed,))
+        con.execute("INSERT INTO pulse_queue VALUES (1, 'old payload', '[\"old\"]', '123')")
+        con.commit()
+        attempts = []
+        def post(*args, **kwargs):
+            text = kwargs["json"]["text"]
+            attempts.append(text)
+            if failure == "old" or (failure == "current" and text != "old payload"):
+                raise requests.HTTPError("synthetic failure")
+            return Response()
+        monkeypatch.setattr(requests, "post", post)
+        if failure == "old" or (failure == "current" and has_current):
+            with pytest.raises(requests.HTTPError):
+                report.deliver_pulse(con, cfg, env)
+            if failure == "old":
+                assert attempts == ["old payload"]
+                assert con.execute("SELECT count(*) FROM pulse_alerts").fetchone()[0] == 0
+            else:
+                assert common.was_alerted_recently(con, "old", Clock.instant, 5)
+                assert not common.was_alerted_recently(con, "current", Clock.instant, 5)
+                # Retry after the signal has left the window: queued payload survives.
+                Clock.instant += timedelta(days=1)
+            failure = None
+            con.close()
+            con = common.connect()
+        report.deliver_pulse(con, cfg, env)
+        assert attempts[0] == "old payload"
+        assert attempts.count("old payload") == (2 if original_failure == "old" else 1)
+        current_attempts = [text for text in attempts if text != "old payload"]
+>       assert len(current_attempts) == (int(has_current) * (2 if original_failure == "current" else 1))
+E       assert 0 == (1 * 1)
+E        +  where 0 = len([])
+E        +  and   1 = int(True)
+
+tests/test_round4_pulse.py:54: AssertionError
+______________ test_pending_pulse_checks_current_window[True-old] ______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10c534160>
+failure = None, has_current = True
+
+    @pytest.mark.parametrize("failure", [None, "old", "current"])
+    @pytest.mark.parametrize("has_current", [False, True])
+    def test_pending_pulse_checks_current_window(monkeypatch, failure, has_current):
+        original_failure = failure
+        Clock.instant = datetime(2026, 10, 21, tzinfo=timezone.utc)
+        monkeypatch.setattr(common, "datetime", Clock)
+        con = common.connect()
+        cfg = dict(common.DEFAULTS, pulse_window_days=1)
+        env = {"TELEGRAM_TOKEN": "test", "TELEGRAM_CHAT_ID": "123"}
+        con.execute("INSERT INTO term_counts VALUES ('history', '2026-09-01', 'f1')")
+        for feed in ("f1", "f2"):
+            con.execute("INSERT INTO term_counts VALUES ('old', '2026-10-20', ?)", (feed,))
+            if has_current:
+                con.execute("INSERT INTO term_counts VALUES ('current', '2026-10-21', ?)", (feed,))
+        con.execute("INSERT INTO pulse_queue VALUES (1, 'old payload', '[\"old\"]', '123')")
+        con.commit()
+        attempts = []
+        def post(*args, **kwargs):
+            text = kwargs["json"]["text"]
+            attempts.append(text)
+            if failure == "old" or (failure == "current" and text != "old payload"):
+                raise requests.HTTPError("synthetic failure")
+            return Response()
+        monkeypatch.setattr(requests, "post", post)
+        if failure == "old" or (failure == "current" and has_current):
+            with pytest.raises(requests.HTTPError):
+                report.deliver_pulse(con, cfg, env)
+            if failure == "old":
+                assert attempts == ["old payload"]
+                assert con.execute("SELECT count(*) FROM pulse_alerts").fetchone()[0] == 0
+            else:
+                assert common.was_alerted_recently(con, "old", Clock.instant, 5)
+                assert not common.was_alerted_recently(con, "current", Clock.instant, 5)
+                # Retry after the signal has left the window: queued payload survives.
+                Clock.instant += timedelta(days=1)
+            failure = None
+            con.close()
+            con = common.connect()
+        report.deliver_pulse(con, cfg, env)
+        assert attempts[0] == "old payload"
+        assert attempts.count("old payload") == (2 if original_failure == "old" else 1)
+        current_attempts = [text for text in attempts if text != "old payload"]
+>       assert len(current_attempts) == (int(has_current) * (2 if original_failure == "current" else 1))
+E       assert 0 == (1 * 1)
+E        +  where 0 = len([])
+E        +  and   1 = int(True)
+
+tests/test_round4_pulse.py:54: AssertionError
+____________ test_pending_pulse_checks_current_window[True-current] ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10c4f3050>
+failure = 'current', has_current = True
+
+    @pytest.mark.parametrize("failure", [None, "old", "current"])
+    @pytest.mark.parametrize("has_current", [False, True])
+    def test_pending_pulse_checks_current_window(monkeypatch, failure, has_current):
+        original_failure = failure
+        Clock.instant = datetime(2026, 10, 21, tzinfo=timezone.utc)
+        monkeypatch.setattr(common, "datetime", Clock)
+        con = common.connect()
+        cfg = dict(common.DEFAULTS, pulse_window_days=1)
+        env = {"TELEGRAM_TOKEN": "test", "TELEGRAM_CHAT_ID": "123"}
+        con.execute("INSERT INTO term_counts VALUES ('history', '2026-09-01', 'f1')")
+        for feed in ("f1", "f2"):
+            con.execute("INSERT INTO term_counts VALUES ('old', '2026-10-20', ?)", (feed,))
+            if has_current:
+                con.execute("INSERT INTO term_counts VALUES ('current', '2026-10-21', ?)", (feed,))
+        con.execute("INSERT INTO pulse_queue VALUES (1, 'old payload', '[\"old\"]', '123')")
+        con.commit()
+        attempts = []
+        def post(*args, **kwargs):
+            text = kwargs["json"]["text"]
+            attempts.append(text)
+            if failure == "old" or (failure == "current" and text != "old payload"):
+                raise requests.HTTPError("synthetic failure")
+            return Response()
+        monkeypatch.setattr(requests, "post", post)
+        if failure == "old" or (failure == "current" and has_current):
+>           with pytest.raises(requests.HTTPError):
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           Failed: DID NOT RAISE HTTPError
+
+tests/test_round4_pulse.py:37: Failed
+=========================== short test summary info ============================
+FAILED tests/test_round4_pulse.py::test_pending_pulse_checks_current_window[True-None]
+FAILED tests/test_round4_pulse.py::test_pending_pulse_checks_current_window[True-old]
+FAILED tests/test_round4_pulse.py::test_pending_pulse_checks_current_window[True-current]
+3 failed, 3 passed in 0.10s

@@ -39,3 +39,17 @@ def send(text, token, chat_id):
             timeout=30,
         )
         resp.raise_for_status()
+
+
+def retry_after(exc):
+    """Задержка Telegram 429; некорректный ответ не скрывает исходную ошибку."""
+    response = getattr(exc, "response", None)
+    if response is None or response.status_code != 429:
+        return None
+    try:
+        value = response.json()["parameters"]["retry_after"]
+        if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+            return value
+    except (ValueError, KeyError, TypeError):
+        pass
+    return None

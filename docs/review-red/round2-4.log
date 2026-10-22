@@ -1,0 +1,42 @@
+venv/bin/python -m pytest tests/test_second_review.py -k weekly -q --tb=short --show-capture=no
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+_______ test_weekly_restart_preserves_payload_and_confirmed_parts[False] _______
+tests/test_second_review.py:79: in test_weekly_restart_preserves_payload_and_confirmed_parts
+    assert attempts == chunks[:2] + chunks[1:]
+E   AssertionError: assert ['📰 RSS за не...е появилось.'] == ['📰 RSS за не...mple.test/44']
+E     
+E     At index 2 diff: '📰 RSS за неделю\n\nЗа неделю новых статей не появилось.' != '• agent 16 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx — https://example.test/16\n• agent 17 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx — https://example.test/17\n• agent 18 xxxxxxxx...
+E     
+E     ...Full output truncated (3 lines hidden), use '-vv' to show
+_______ test_weekly_restart_preserves_payload_and_confirmed_parts[True] ________
+tests/test_second_review.py:79: in test_weekly_restart_preserves_payload_and_confirmed_parts
+    assert attempts == chunks[:2] + chunks[1:]
+E   AssertionError: assert ['📰 RSS за не...е появилось.'] == ['📰 RSS за не...mple.test/44']
+E     
+E     At index 2 diff: '📰 RSS за неделю\n\nЗа неделю новых статей не появилось.' != '• agent 16 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx — https://example.test/16\n• agent 17 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx — https://example.test/17\n• agent 18 xxxxxxxx...
+E     
+E     ...Full output truncated (3 lines hidden), use '-vv' to show
+____________ test_weekly_retry_after_persists_until_exact_boundary _____________
+tests/test_second_review.py:96: in test_weekly_retry_after_persists_until_exact_boundary
+    assert attempts == chunks[:2]
+E   AssertionError: assert ['📰 RSS за не...mple.test/44'] == ['📰 RSS за не...mple.test/31']
+E     
+E     Left contains 3 more items, first extra item: '📰 RSS за неделю\n⚠️ claude CLI не найден в PATH — дайджест собран без Claude.\n\nНовое за неделю:\n• agent 0 xxxxxxxx...xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx — https://example.test/15'
+E     Use -v to get more diff
+_________________ test_weekly_pending_recipient_cannot_change __________________
+tests/test_second_review.py:113: in test_weekly_pending_recipient_cannot_change
+    report.main()
+report.py:446: in main
+    telegram.send(text, env["TELEGRAM_TOKEN"], env["TELEGRAM_CHAT_ID"])
+telegram.py:35: in send
+    resp = requests.post(
+tests/test_second_review.py:107: in post
+    raise requests.ReadTimeout('synthetic lost response')
+E   requests.exceptions.ReadTimeout: synthetic lost response
+=========================== short test summary info ============================
+FAILED tests/test_second_review.py::test_weekly_restart_preserves_payload_and_confirmed_parts[False]
+FAILED tests/test_second_review.py::test_weekly_restart_preserves_payload_and_confirmed_parts[True]
+FAILED tests/test_second_review.py::test_weekly_retry_after_persists_until_exact_boundary
+FAILED tests/test_second_review.py::test_weekly_pending_recipient_cannot_change
+4 failed, 3 deselected in 0.09s
