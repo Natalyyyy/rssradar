@@ -25,7 +25,7 @@ def _python():
 
 def _launchd_path():
     """PATH из среды, где ставится расписание (обычный шелл с homebrew/npm/nvm),
-    чтобы под launchd (минимальный PATH) находился 'claude' и прочие бинари."""
+    чтобы под launchd (минимальный PATH) находился 'codex' и прочие бинари."""
     from xml.sax.saxutils import escape
     return escape(os.environ.get("PATH", "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"))
 

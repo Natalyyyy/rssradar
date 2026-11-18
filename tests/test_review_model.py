@@ -7,15 +7,15 @@ import report
 @pytest.mark.parametrize("kind", ["summary", "clusters"])
 @pytest.mark.parametrize("outcome", ["ok", "empty", "exit", "timeout", "oserror"])
 def test_model_invocation_is_isolated(monkeypatch, tmp_path, kind, outcome):
-    monkeypatch.setattr(report.shutil, "which", lambda name: "/test/claude")
+    monkeypatch.setattr(report.shutil, "which", lambda name: "/test/codex" if name == "codex" else None)
     monkeypatch.setenv("TELEGRAM_TOKEN", "secret")
     prompt = tmp_path / "prompt.md"
     prompt.write_text("instructions")
     calls = []
     def run(cmd, **kw):
         calls.append(cmd)
-        assert cmd[cmd.index("--tools") + 1] == ""
-        assert cmd[cmd.index("--model") + 1] == "claude-opus-5"
+        assert cmd[cmd.index("--access") + 1] == "none"
+        assert cmd[cmd.index("--model") + 1] == "gpt-6-sol"
         assert "TELEGRAM_TOKEN" not in kw["env"]
         assert "untrusted title" in kw["input"]
         if outcome == "timeout":
@@ -39,7 +39,7 @@ def test_clusters_missing_cli_and_invalid_json(monkeypatch, tmp_path):
     entries = [{"title":"x", "link":"https://x"}]
     monkeypatch.setattr(report.shutil, "which", lambda name: None)
     assert report.claude_clusters(entries, prompt) is None
-    monkeypatch.setattr(report.shutil, "which", lambda name: "/test/claude")
+    monkeypatch.setattr(report.shutil, "which", lambda name: "/test/codex" if name == "codex" else None)
     monkeypatch.setattr(report.subprocess, "run", lambda *a, **k:
                         SimpleNamespace(returncode=0, stdout="[broken]"))
     assert report.claude_clusters(entries, prompt) is None

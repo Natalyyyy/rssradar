@@ -16,32 +16,26 @@ import common
 import requests
 
 
-# --- модель ходит без токенов (security-ревью 29.08.2026) -------------------
-# В окружении прогона лежат ключи, и процесс модели наследовал их все: инъекция
-# из недоверенного текста, дотянувшаяся до исполнения, забирала их одной
-# строкой. Модели они не нужны — сеть за неё делают скрипты.
-# CLAUDE_CODE_OAUTH_TOKEN намеренно НЕ снимаем: им логинится сам CLI.
-_СЕКРЕТЫ_МИМО_МОДЕЛИ = (
-    "TELEGRAM_BOT_TOKEN", "TELEGRAM_TOKEN", "TELEGRAPH_TOKEN", "TGSTAT_TOKEN",
-    "APIFY_TOKEN", "IG_ACCESS_TOKEN", "GROQ_API_KEY", "HEALTH_BOT_TOKEN",
-    "GCAL_SA", "DASHBOARD_AUTH", "GRANOLA_API_KEY",
+# Недоверенные RSS-заголовки уходят в модель без инструментов и токенов.
+_ENV_FOR_CODEX = (
+    "PATH", "HOME", "USER", "LOGNAME", "SHELL", "TMPDIR", "LANG", "LC_ALL",
+    "LC_CTYPE", "TZ", "TERM", "CODEX_HOME", "CODEX_BIN", "XDG_CONFIG_HOME",
+    "XDG_CACHE_HOME", "XDG_DATA_HOME", "SSL_CERT_FILE", "SSL_CERT_DIR",
+    "NODE_EXTRA_CA_CERTS",
 )
 
 
 def _env_без_секретов(base=None):
-    env = dict(base if base is not None else os.environ)
-    for имя in _СЕКРЕТЫ_МИМО_МОДЕЛИ:
-        env.pop(имя, None)
-    return env
+    source = base if base is not None else os.environ
+    return {key: source[key] for key in _ENV_FOR_CODEX if key in source}
 
 
-CLAUDE_MISSING_MSG = "⚠️ claude CLI не найден в PATH — дайджест собран без Claude."
+CLAUDE_MISSING_MSG = "⚠️ Codex CLI не найден в PATH — дайджест собран без модели."
 
 
 def _claude_bin():
-    """Абсолютный путь к claude CLI или None. Под launchd PATH минимальный,
-    поэтому зовём по голому имени 'claude' нельзя — резолвим явно."""
-    return shutil.which("claude")
+    """Путь к Codex CLI. Старое имя функции сохранено для вызывающего кода."""
+    return os.environ.get("CODEX_BIN") or shutil.which("codex")
 
 
 def term_links(con, term, since_day, limit=3, until_day=None):
@@ -158,20 +152,21 @@ def weekly_entries(con, cfg, now=None):
     return out
 
 
-def _run_claude(claude_bin, prompt):
-    # Внешние заголовки недоверенные: инструменты отключены, модель задана явно.
+def _run_claude(codex_bin, prompt):
+    # Внешние заголовки недоверенные: --access none отключает инструменты.
+    env = _env_без_секретов()
+    env["CODEX_BIN"] = codex_bin
     return subprocess.run(
-        [claude_bin, "-p", "--output-format", "text",
-         "--model", "claude-opus-5",
-         "--tools", "",
-         "--disallowedTools", "Bash,Monitor,BashOutput,KillShell,Task,Agent,WebFetch,WebSearch,NotebookEdit,Read,Write,Edit"],
-        input=prompt, env=_env_без_секретов(),
-        capture_output=True, text=True, timeout=300,
+        ["bash", str(Path(__file__).resolve().parent / "llm_run.sh"),
+         "--engine", "codex", "--model", "gpt-6-sol", "--effort", "low",
+         "--access", "none", "--timeout", "300", "--cwd", str(common.ROOT)],
+        input=prompt, env=env, cwd=common.ROOT,
+        capture_output=True, text=True, timeout=310,
     )
 
 
 def claude_summary(entries, prompt_path):
-    """Тематический дайджест недели через headless Claude. Любой сбой → None."""
+    """Тематический дайджест недели через Codex. Любой сбой → None."""
     if not entries:
         return None
     claude_bin = _claude_bin()
@@ -203,7 +198,7 @@ def build_weekly(con, cfg, now=None):
     lines = [header]
     if claude_missing:                                  # не молча фолбэкаем — говорим прямо
         lines.append(CLAUDE_MISSING_MSG)
-    lines += ["", "Новое за неделю:"]                   # фолбэк без Claude
+    lines += ["", "Новое за неделю:"]                   # фолбэк без модели
     for e in entries:
         title = " ".join((e["title"] or "").split())
         lines.append("• {} — {}".format(title, e["link"]))
@@ -211,7 +206,7 @@ def build_weekly(con, cfg, now=None):
 
 
 def _clean_clusters(raw):
-    """Приводит распарсенный JSON от Claude к списку валидных кластеров или None."""
+    """Приводит распарсенный JSON от модели к списку валидных кластеров или None."""
     if not isinstance(raw, list):
         return None
     clusters = []
@@ -237,7 +232,7 @@ def _clean_clusters(raw):
 
 
 def claude_clusters(entries, prompt_path):
-    """Тематические кластеры недели (JSON) через headless Claude. Любой сбой → None."""
+    """Тематические кластеры недели (JSON) через Codex. Любой сбой → None."""
     if not entries:
         return None
     claude_bin = _claude_bin()
@@ -321,7 +316,7 @@ def build_map(con, cfg, now=None):
     if clusters is None:                       # фолбэк: одна тема-свалка
         theme = "Новое за неделю"
         if claude_missing and entries:         # не молча фолбэкаем — говорим прямо
-            theme = "Новое за неделю (без Claude — claude CLI не найден в PATH)"
+            theme = "Новое за неделю (без модели — Codex CLI не найден в PATH)"
         clusters = [{"theme": theme, "heat": 3,
                      "items": [{"title": e["title"], "link": e["link"]}
                                for e in entries]}] if entries else []

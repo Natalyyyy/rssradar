@@ -15,7 +15,7 @@ import report
 
 def _перехват(monkeypatch, модуль):
     захват = {}
-    monkeypatch.setattr(модуль.shutil, "which", lambda name: "/test/claude")
+    monkeypatch.setattr(модуль.shutil, "which", lambda name: "/test/codex" if name == "codex" else None)
 
     def подделка(cmd, **kw):
         захват["cmd"] = list(cmd)
@@ -36,17 +36,19 @@ def _промпт(tmp_path):
 def test_набор_инструментов_сужен(monkeypatch, tmp_path):
     захват = _перехват(monkeypatch, report)
     report.claude_summary([{"title": "тема", "link": "https://x/y"}], _промпт(tmp_path))
-    assert "--tools" in захват["cmd"], "набор инструментов не сужен"
-    assert захват["cmd"][захват["cmd"].index("--tools") + 1] == ""
+    assert захват["cmd"][:2] == ["bash", str(report.Path(report.__file__).resolve().parent / "llm_run.sh")]
+    assert захват["cmd"][захват["cmd"].index("--engine") + 1] == "codex"
+    assert захват["cmd"][захват["cmd"].index("--model") + 1] == "gpt-6-sol"
+    assert захват["cmd"][захват["cmd"].index("--effort") + 1] == "low"
+    assert захват["cmd"][захват["cmd"].index("--access") + 1] == "none"
 
 
-def test_шелл_и_подагенты_запрещены(monkeypatch, tmp_path):
+def test_промпт_через_stdin_а_не_argv(monkeypatch, tmp_path):
     захват = _перехват(monkeypatch, report)
     report.claude_summary([{"title": "тема", "link": "https://x/y"}], _промпт(tmp_path))
-    assert "--disallowedTools" in захват["cmd"]
-    запреты = захват["cmd"][захват["cmd"].index("--disallowedTools") + 1]
-    for имя in ("Bash", "Monitor", "Task", "WebFetch"):
-        assert имя in запреты, имя
+    assert "тема" in захват["input"]
+    assert "тема" not in захват["cmd"]
+    assert захват["cmd"][захват["cmd"].index("--timeout") + 1] == "300"
 
 
 def test_токены_не_доезжают_до_модели(monkeypatch, tmp_path):
@@ -60,3 +62,4 @@ def test_токены_не_доезжают_до_модели(monkeypatch, tmp_p
         env = os.environ
     утекло = [имя for имя in ("TELEGRAM_TOKEN",) if имя in env]
     assert утекло == [], "в окружение модели утекли " + str(утекло)
+    assert env["CODEX_BIN"] == "/test/codex"
